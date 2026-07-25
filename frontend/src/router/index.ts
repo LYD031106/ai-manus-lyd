@@ -2,8 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { getStoredToken } from '../api/auth'
 import { getCachedClientConfig } from '../api/config'
 
-// Pages are lazy-loaded so heavy dependencies (Monaco, NoVNC, Claw assets)
-// stay out of the initial bundle.
+// Pages are lazy-loaded to keep the initial bundle small.
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -40,11 +39,6 @@ export const router = createRouter({
           path: '',
           component: () => import('../pages/HomePage.vue'),
           alias: ['/', '/home'],
-          meta: { requiresAuth: true }
-        },
-        {
-          path: 'claw',
-          component: () => import('../pages/ClawPage.vue'),
           meta: { requiresAuth: true }
         },
         {

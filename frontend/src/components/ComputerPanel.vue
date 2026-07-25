@@ -20,7 +20,6 @@
         @hide="hideComputerPanel"
         @jumpToRealTime="jumpToRealTime"
         @selectTool="onSelectTool"
-        @useComputer="onUseComputer"
       />
     </div>
   </div>
@@ -49,7 +48,6 @@ const visible = ref(true)
 const emit = defineEmits<{
   (e: 'jumpToRealTime'): void
   (e: 'selectTool', tool: ToolContent): void
-  (e: 'useComputer'): void
 }>()
 
 defineProps<{
@@ -80,10 +78,6 @@ const onSelectTool = (tool: ToolContent) => {
   toolContent.value = tool
   live.value = false
   emit('selectTool', tool)
-}
-
-const onUseComputer = () => {
-  emit('useComputer')
 }
 
 onMounted(() => {

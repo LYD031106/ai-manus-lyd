@@ -35,59 +35,6 @@
       </div>
 
       <div class="flex shrink-0 items-center gap-[4px]">
-        <!-- Use Manus's computer -->
-        <div v-if="!isShare" class="relative" ref="useComputerRef">
-          <button
-            type="button"
-            class="flex items-center justify-center size-[32px] rounded-[8px] p-0 text-[var(--icon-secondary)] hover:bg-[var(--fill-tsp-white-light)] cursor-pointer"
-            :class="{ 'bg-[var(--fill-tsp-gray-main)]': showUseComputer }"
-            :title="useComputerTitle"
-            @click="showUseComputer = !showUseComputer">
-            <Monitor :size="18" />
-          </button>
-          <div
-            v-if="showUseComputer"
-            class="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(480px,calc(100vw-32px))] rounded-[20px] border border-[var(--border-main)] bg-[var(--background-menu-white)] shadow-[0px_8px_32px_0px_var(--shadow-S)] p-4 flex flex-col gap-3">
-            <div class="flex justify-between items-center">
-              <div class="flex items-center gap-1.5 min-w-0">
-                <Monitor :size="20" class="text-[var(--icon-primary)] shrink-0" />
-                <h2 class="text-lg text-[var(--text-primary)] font-semibold truncate">
-                  {{ t("Use application on {product}'s computer", { product: 'Manus' }) }}
-                </h2>
-              </div>
-              <button
-                type="button"
-                class="size-8 rounded-[8px] inline-flex items-center justify-center hover:bg-[var(--fill-tsp-white-main)]"
-                :title="t('Close')"
-                @click="showUseComputer = false">
-                <X :size="16" class="text-[var(--icon-tertiary)]" />
-              </button>
-            </div>
-            <div class="text-[var(--text-secondary)] text-[13px] leading-[18px]">
-              <span>{{ t("You're about to use {product}'s computer. ", { product: 'Manus' }) }}</span>
-              <span class="text-[var(--text-primary)]">{{ t('When finished, please inform {product} of your changes to help it work effectively.', { product: 'Manus' }) }}</span>
-            </div>
-            <div class="flex justify-end gap-2 mt-[4px]">
-              <button
-                type="button"
-                class="h-9 px-4 rounded-[10px] text-sm text-[var(--text-secondary)] hover:bg-[var(--fill-tsp-white-main)]"
-                @click="showUseComputer = false">
-                {{ t('Cancel') }}
-              </button>
-              <button
-                type="button"
-                class="h-9 px-4 rounded-[10px] text-sm bg-[var(--Button-primary-black)] text-[var(--text-onblack)] hover:opacity-90"
-                @click="confirmUseComputer">
-                {{ t('Use application') }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="!isShare" class="flex items-center px-[4px]">
-          <div class="h-[16px] w-px bg-[var(--border-dark)]" />
-        </div>
-
         <button
           type="button"
           class="size-[32px] rounded-[8px] inline-flex items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-white-main)]"
@@ -189,7 +136,7 @@
 import { toRef, ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
-  PlayIcon, X, Monitor,
+  PlayIcon, X,
   SkipBack, SkipForward,
 } from 'lucide-vue-next';
 import type { ToolContent } from '@/types/message';
@@ -215,8 +162,6 @@ const { t, locale } = useI18n();
 const { toolInfo } = useToolInfo(toRef(props, 'toolContent'));
 
 const isScrubbing = ref(false);
-const showUseComputer = ref(false);
-const useComputerRef = ref<HTMLElement | null>(null);
 const hoverTooltip = ref(false);
 const hoverPercent = ref(0);
 const hoverTs = ref(0);
@@ -238,8 +183,6 @@ const actionLabel = computed(() => {
   const arg = toolInfo.value.functionArg;
   return arg ? `${toolInfo.value.function} ${arg}` : toolInfo.value.function;
 });
-
-const useComputerTitle = computed(() => t("Use {product}'s computer", { product: 'Manus' }));
 
 const hoverTimeLabel = computed(() => {
   const d = new Date(hoverTs.value * 1000);
@@ -314,18 +257,12 @@ const emit = defineEmits<{
   (e: 'jumpToRealTime'): void;
   (e: 'hide'): void;
   (e: 'selectTool', tool: ToolContent): void;
-  (e: 'useComputer'): void;
 }>();
 
 const hide = () => emit('hide');
 const jumpToRealTime = () => {
   playheadTs.value = timelineEnd.value;
   emit('jumpToRealTime');
-};
-
-const confirmUseComputer = () => {
-  showUseComputer.value = false;
-  emit('useComputer');
 };
 
 /** Last tool whose timestamp is <= t (timeline scrub mapping). */
@@ -419,12 +356,6 @@ watch(
   },
 );
 
-const handleClickOutside = (event: MouseEvent) => {
-  if (showUseComputer.value && useComputerRef.value && !useComputerRef.value.contains(event.target as Node)) {
-    showUseComputer.value = false;
-  }
-};
-
 const handleKeydown = (event: KeyboardEvent) => {
   const root = document.getElementById('manus-agent-workspace');
   if (!root) return;
@@ -441,7 +372,6 @@ const handleKeydown = (event: KeyboardEvent) => {
 };
 
 onMounted(() => {
-  document.addEventListener('mousedown', handleClickOutside);
   document.addEventListener('keydown', handleKeydown);
   playheadTs.value = props.toolContent
     ? toUnixSec(props.toolContent.timestamp)
@@ -452,7 +382,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  document.removeEventListener('mousedown', handleClickOutside);
   document.removeEventListener('keydown', handleKeydown);
   if (clockTimer) {
     clearInterval(clockTimer);

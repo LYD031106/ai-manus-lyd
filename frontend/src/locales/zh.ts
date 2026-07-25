@@ -384,8 +384,10 @@ export default {
   'Claw has stopped, please recreate to continue chatting.': 'Claw 已停止运行，请重新创建以继续对话。',
   'Delete and recreate': '删除并重新创建',
   'An error occurred': '发生错误',
+  'Chat request failed: {error}': '模型请求失败：{error}',
+  'Unknown error': '未知错误',
   'Creation failed, please try again later': '创建失败，请稍后重试',
   'Please check {count} attachment(s) I sent': '（请查看我发送的 {count} 个附件）',
   'WebSocket not connected, please try again later': 'WebSocket 未连接，请稍后重试',
   'Claw has expired, please recreate.': 'Claw 已过期，请重新创建。',
-} 
+}

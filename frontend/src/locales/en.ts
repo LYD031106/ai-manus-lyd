@@ -384,8 +384,10 @@ export default {
   'Claw has stopped, please recreate to continue chatting.': 'Claw has stopped, please recreate to continue chatting.',
   'Delete and recreate': 'Delete and recreate',
   'An error occurred': 'An error occurred',
+  'Chat request failed: {error}': 'Chat request failed: {error}',
+  'Unknown error': 'Unknown error',
   'Creation failed, please try again later': 'Creation failed, please try again later',
   'Please check {count} attachment(s) I sent': 'Please check {count} attachment(s) I sent',
   'WebSocket not connected, please try again later': 'WebSocket not connected, please try again later',
   'Claw has expired, please recreate.': 'Claw has expired, please recreate.',
-} 
+}

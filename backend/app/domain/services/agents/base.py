@@ -208,11 +208,25 @@ class BaseAgent(ABC):
 
                     tool = self.get_tool(function_name)
                     if not tool:
-                        yield ErrorEvent(error=f"Unknown tool: {function_name}")
+                        # A model may occasionally hallucinate a tool name (or
+                        # try to use an execution tool while the planner is
+                        # only allowed to submit structured output). Keep this
+                        # inside the model correction loop. Streaming an
+                        # ErrorEvent here is terminal for the SSE consumer and
+                        # disconnects the UI even though the agent can recover
+                        # on its next turn.
+                        logger.warning(
+                            "Agent %s requested unavailable tool %s; asking the model to retry",
+                            self.name,
+                            function_name,
+                        )
                         tool_responses.append(LLMMessage.tool(
                             tool_call_id=tool_call_id,
                             name=function_name,
-                            content=f"Unknown tool: {function_name}",
+                            content=(
+                                f"Unknown tool: {function_name}. It is not available in the current phase. "
+                                "Use one of the tools provided in the current request."
+                            ),
                         ))
                         continue
 

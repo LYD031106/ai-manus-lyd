@@ -285,6 +285,7 @@ class TestAgentLoopStructuredOutput:
         ])
         agent = _agent(llm)
         events = await _collect(agent.execute("do it"))
+        assert not any(isinstance(event, ErrorEvent) for event in events)
         # The dangling tool call was answered so the history stays valid.
         unknown = [
             m for m in agent.memory.get_messages()

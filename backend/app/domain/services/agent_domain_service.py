@@ -94,6 +94,35 @@ class AgentDomainService:
             await task.cancel()
         await self._session_repository.update_status(session_id, SessionStatus.COMPLETED)
 
+    async def destroy_session_resources(self, session: Session) -> None:
+        """Stop a session task and destroy its dedicated sandbox."""
+        task = await self._get_task(session)
+        if task:
+            await task.cancel()
+
+        if not session.sandbox_id:
+            return
+
+        try:
+            sandbox = await self._sandbox_cls.get(session.sandbox_id)
+            if sandbox:
+                destroyed = await sandbox.destroy()
+                if not destroyed:
+                    logger.warning(
+                        "Sandbox %s could not be destroyed for session %s",
+                        session.sandbox_id,
+                        session.id,
+                    )
+        except Exception as exc:
+            # Session deletion should remain idempotent when the container has
+            # already expired or was removed manually.
+            logger.warning(
+                "Sandbox %s was already unavailable while deleting session %s: %s",
+                session.sandbox_id,
+                session.id,
+                exc,
+            )
+
     async def chat(
         self,
         session_id: str,
@@ -116,24 +145,30 @@ class AgentDomainService:
             task = await self._get_task(session)
 
             if message:
+                message_event = MessageEvent(
+                    message=message,
+                    role="user",
+                    attachments=attachments
+                )
+
+                # Persist the user's input before provisioning a sandbox or
+                # invoking the model. This keeps the conversation recoverable
+                # when infrastructure or provider startup fails.
+                await self._session_repository.update_latest_message(
+                    session_id,
+                    message,
+                    timestamp or datetime.now()
+                )
+                await self._session_repository.add_event(session_id, message_event)
+
                 if session.status != SessionStatus.RUNNING:
                     task = await self._create_task(session)
                     if not task:
                         raise RuntimeError("Failed to create task")
-                
-                await self._session_repository.update_latest_message(session_id, message, timestamp or datetime.now())
-
-                message_event = MessageEvent(
-                    message=message, 
-                    role="user", 
-                    attachments=attachments
-                )
 
                 event_id = await task.input_stream.put(message_event.model_dump_json())
 
                 message_event.id = event_id
-                await self._session_repository.add_event(session_id, message_event)
-                
                 await task.run()
                 logger.debug(f"Put message into Session {session_id}'s event queue: {message[:50]}...")
             

@@ -111,7 +111,6 @@
 
       <div class="mx-auto w-full max-w-full sm:max-w-[768px] sm:min-w-[390px] flex flex-col flex-1 px-5 min-h-0">
         <div class="flex flex-col w-full gap-[12px] pb-[80px] pt-[12px] flex-1 overflow-y-auto">
-          <TakeControlBanner :visible="showTakeControlBanner" @takeControl="handleTakeControl" />
           <ChatMessage v-for="(message, index) in messages" :key="index" :message="message"
             :hideHeader="isConsecutiveAssistant(messages, index)"
             @toolClick="handleToolClick" />
@@ -131,8 +130,7 @@
     <ComputerPanel ref="computerPanel" :size="computerPanelSize" :sessionId="sessionId" :realTime="realTime"
       :isShare="false" :toolHistory="toolHistory" :plan="plan"
       @jumpToRealTime="jumpToRealTime"
-      @selectTool="handleSelectTool"
-      @useComputer="handleTakeControl" />
+      @selectTool="handleSelectTool" />
   </SimpleBar>
 </template>
 
@@ -143,7 +141,6 @@ import { useRouter, onBeforeRouteUpdate } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ChatBox from '../components/ChatBox.vue';
 import ChatMessage from '../components/ChatMessage.vue';
-import TakeControlBanner from '../components/TakeControlBanner.vue';
 import * as agentApi from '../api/agent';
 import { Message, MessageContent, ToolContent, AttachmentsContent, StepContent, isConsecutiveAssistant } from '../types/message';
 import { PlanEventData, AgentSSEEvent } from '../types/event';
@@ -234,8 +231,6 @@ const toolHistory = computed(() => {
   return tools;
 });
 
-const showTakeControlBanner = computed(() => sessionStatus.value === SessionStatus.WAITING);
-
 const chatPlaceholder = computed(() => t('Send message to Manus'));
 
 // Shared SSE event -> message list conversion
@@ -273,6 +268,24 @@ watch(messages, async () => {
 
 const handleSubmit = () => {
   chat(inputMessage.value, attachments.value);
+}
+
+const reportChatError = (error: unknown) => {
+  const detail = error instanceof Error && error.message
+    ? error.message
+    : t('Unknown error');
+  const content = t('Chat request failed: {error}', { error: detail });
+
+  messages.value.push({
+    type: 'assistant',
+    content: {
+      content,
+      timestamp: Math.floor(Date.now() / 1000)
+    } as MessageContent,
+  });
+  showErrorToast(content);
+  isLoading.value = false;
+  cancelCurrentChat.value = null;
 }
 
 const chat = async (message: string = '', files: FileInfo[] = []) => {
@@ -340,18 +353,13 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
         },
         onError: (error) => {
           console.error('Chat error:', error);
-          isLoading.value = false;
-          // Clear the cancel function when there's an error
-          if (cancelCurrentChat.value) {
-            cancelCurrentChat.value = null;
-          }
+          reportChatError(error);
         }
       }
     );
   } catch (error) {
     console.error('Chat error:', error);
-    isLoading.value = false;
-    cancelCurrentChat.value = null;
+    reportChatError(error);
   }
 }
 
@@ -532,19 +540,6 @@ const handleCopyLink = async () => {
     console.error('Error copying share link:', error);
     showErrorToast(t('Failed to copy link'));
   }
-}
-
-const handleTakeControl = () => {
-  if (!sessionId.value) return;
-  // Prefer opening computer panel on latest browser tool, then enter takeover
-  const browserTool = [...toolHistory.value].reverse().find((t) => t.name === 'browser');
-  if (browserTool) {
-    realTime.value = true;
-    computerPanel.value?.showComputerPanel(browserTool, true);
-  }
-  window.dispatchEvent(new CustomEvent('takeover', {
-    detail: { sessionId: sessionId.value, active: true }
-  }));
 }
 
 const handleSelectTool = (tool: ToolContent) => {

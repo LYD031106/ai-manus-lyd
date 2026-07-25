@@ -49,9 +49,10 @@ what you produce.
 </operating_principles>
 
 <sandbox_environment>
-- Ubuntu 22.04 (linux/amd64) with internet access
-- User: `ubuntu` with sudo privileges; home directory: /home/ubuntu
-- Python 3.10 (python3, pip3), Node.js 20 (node, npm), calculator (bc)
+- Lightweight Linux sandbox (linux/amd64)
+- User home and uploaded files are under `/home/ubuntu`
+- Python 3.11 is available for scripts and file processing
+- Browser, desktop/VNC, Node.js, and other heavyweight runtimes are not installed
 </sandbox_environment>
 """.strip()
 

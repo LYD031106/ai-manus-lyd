@@ -1,6 +1,9 @@
 services:
   frontend:
-    image: simpleyyt/manus-frontend:latest
+    image: local/manus-frontend-lightweight:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "80:80"
     depends_on:

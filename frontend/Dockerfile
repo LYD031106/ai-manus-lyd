@@ -4,11 +4,15 @@ FROM node:18-alpine as build-stage
 # Set working directory
 WORKDIR /app
 
+# Keep builds safe on small production hosts.
+ENV NODE_OPTIONS=--max-old-space-size=768
+
 # Copy package.json and package-lock.json files
 COPY package*.json ./
 
 # Install project dependencies
-RUN npm ci
+RUN npm config set registry https://registry.npmmirror.com \
+    && npm ci --no-audit --no-fund
 
 # Copy project files
 COPY . .
@@ -27,10 +31,11 @@ COPY nginx.conf /etc/nginx/nginx.conf.template
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh \
+    && chmod +x /docker-entrypoint.sh
 
 # Expose port 80
 EXPOSE 80
 
 # Start nginx with environment variable substitution
-CMD ["/docker-entrypoint.sh"] 
+CMD ["/docker-entrypoint.sh"]

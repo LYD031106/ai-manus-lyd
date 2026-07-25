@@ -482,9 +482,9 @@ class DockerSandbox(Sandbox):
         try:
             if self.client:
                 await self.client.aclose()
-            if self.container_name:
+            if self._container_name:
                 docker_client = docker.from_env()
-                docker_client.containers.get(self.container_name).remove(force=True)
+                docker_client.containers.get(self._container_name).remove(force=True)
             return True
         except Exception as e:
             logger.error(f"Failed to destroy Docker sandbox: {str(e)}")

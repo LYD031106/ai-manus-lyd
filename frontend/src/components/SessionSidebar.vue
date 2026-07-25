@@ -81,21 +81,6 @@
           </div>
         </div>
 
-        <!-- Claw (product-specific) -->
-        <div
-          v-if="clawEnabled"
-          @click="handleClawClick"
-          :title="isSessionSidebarShow ? undefined : 'Manus Claw'"
-          class="flex items-center rounded-[10px] clickable cursor-pointer transition-colors w-full gap-[8px] h-[36px] pointer-events-auto ps-[8px] pe-[2px]"
-          :class="route.path === '/chat/claw' ? 'bg-[var(--fill-tsp-white-main)]' : 'hover:bg-[var(--fill-tsp-white-light)]'">
-          <div class="shrink-0 size-[20px] flex items-center justify-center">
-            <div class="claw-nav-icon w-[18px] h-[18px]" />
-          </div>
-          <div v-if="isSessionSidebarShow" class="flex-1 min-w-0 flex gap-[4px] items-center text-[14px] text-[var(--text-primary)]">
-            <span class="truncate">Manus Claw</span>
-          </div>
-        </div>
-
         <!-- Scroll: Projects + Tasks -->
         <div v-if="isSessionSidebarShow" class="flex flex-col flex-1 min-h-0 -mx-[8px] overflow-hidden">
           <div
@@ -341,7 +326,6 @@ import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getSessionsSSE, getSessions } from '../api/agent';
 import { getProjects, createProject, pinProject } from '../api/project';
-import { getCachedClientConfig } from '../api/config';
 import { ListSessionItem, ProjectItem } from '../types/response';
 import { useI18n } from 'vue-i18n';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
@@ -359,7 +343,6 @@ const sessions = ref<ListSessionItem[]>([])
 const projects = ref<ProjectItem[]>([])
 const cancelGetSessionsSSE = ref<(() => void) | null>(null)
 const isListScrolled = ref(false)
-const clawEnabled = ref(false)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const filterMenuRef = ref<HTMLElement | null>(null)
 
@@ -539,10 +522,6 @@ const loadProjects = async () => {
   }
 }
 
-const handleClawClick = () => {
-  router.push('/chat/claw')
-}
-
 const toggleFilterMenu = () => {
   showFilterMenu.value = !showFilterMenu.value
 }
@@ -591,10 +570,6 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 onMounted(async () => {
-  getCachedClientConfig().then(cfg => {
-    clawEnabled.value = cfg?.claw_enabled ?? false
-  })
-
   fetchSessions()
   loadProjects()
   eventBus.on('projects:changed', loadProjects)

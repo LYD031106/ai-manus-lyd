@@ -372,6 +372,9 @@ export const createSSEConnection = async <T = any>(
             onError(error);
           }
           reject(error);
+          // fetch-event-source retries POST requests when onerror returns.
+          // Throw to stop retries so a chat message is never submitted twice.
+          throw error;
         },
       });
 
@@ -388,4 +391,4 @@ export const createSSEConnection = async <T = any>(
   return () => {
     abortController.abort();
   };
-}; 
+};

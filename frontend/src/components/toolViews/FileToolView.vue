@@ -17,30 +17,17 @@
     </div>
 
     <div class="focus-visible:outline-none flex-1 min-h-0 h-full text-sm flex flex-col py-0 outline-none overflow-auto">
-      <div v-if="activeView === 'diff' && hasOldContent" class="flex-1 min-h-0 h-full">
-        <MonacoDiffEditor
-          class="w-full h-full"
-          :original="oldContent || ''"
-          :modified="fileContent"
-          :filename="fileName"
-        />
+      <div
+        v-if="activeView === 'diff' && hasOldContent"
+        class="grid grid-cols-2 flex-1 min-h-0 divide-x divide-[var(--border-main)]"
+      >
+        <pre class="overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-5 text-[var(--text-primary)]">{{ oldContent }}</pre>
+        <pre class="overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-5 text-[var(--text-primary)]">{{ fileContent }}</pre>
       </div>
-      <section
+      <pre
         v-else
-        class="flex relative w-full h-full flex-1 min-h-0"
-        style="text-align: initial">
-        <MonacoEditor
-          :value="activeView === 'oldContent' ? (oldContent || '') : fileContent"
-          :filename="fileName"
-          :read-only="true"
-          theme="vs"
-          :line-numbers="'off'"
-          :word-wrap="'on'"
-          :minimap="false"
-          :scroll-beyond-last-line="false"
-          :automatic-layout="true"
-        />
-      </section>
+        class="w-full h-full flex-1 min-h-0 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-5 text-[var(--text-primary)]"
+      >{{ activeView === 'oldContent' ? (oldContent || '') : fileContent }}</pre>
     </div>
   </div>
 </template>
@@ -50,8 +37,6 @@ import { ref, computed, toRef, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ToolContent } from '@/types/message';
 import { viewFile } from '@/api/agent';
-import MonacoEditor from '@/components/ui/MonacoEditor.vue';
-import MonacoDiffEditor from '@/components/ui/MonacoDiffEditor.vue';
 import { useLiveToolContent } from '@/composables/useLiveToolContent';
 
 type FileTab = 'diff' | 'oldContent' | 'newContent';
@@ -90,13 +75,6 @@ const activeView = computed<FileTab>(() => {
 const filePath = computed(() => {
   if (props.toolContent && props.toolContent.args.file) {
     return props.toolContent.args.file;
-  }
-  return '';
-});
-
-const fileName = computed(() => {
-  if (filePath.value) {
-    return filePath.value.split('/').pop() || '';
   }
   return '';
 });
