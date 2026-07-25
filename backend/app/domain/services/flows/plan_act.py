@@ -47,7 +47,7 @@ class PlanActFlow(BaseFlow):
         session_id: str,
         session_repository: SessionRepository,
         sandbox: Sandbox,
-        browser: Browser,
+        browser: Optional[Browser],
         mcp_tool: MCPToolkit,
         llm: LLM,
         search_engine: Optional[SearchEngine] = None,
@@ -64,11 +64,13 @@ class PlanActFlow(BaseFlow):
 
         tools = [
             ShellToolkit(sandbox),
-            BrowserToolkit(browser),
             FileToolkit(sandbox),
             MessageToolkit(),
             mcp_tool
         ]
+
+        if browser is not None:
+            tools.insert(1, BrowserToolkit(browser))
         
         # Only add search tool when search_engine is not None
         if search_engine:

@@ -49,7 +49,7 @@ class AgentTaskRunner(TaskRunner):
         agent_id: str,
         user_id: str,
         sandbox: Sandbox,
-        browser: Browser,
+        browser: Optional[Browser],
         agent_repository: AgentRepository,
         session_repository: SessionRepository,
         file_storage: FileStorage,
@@ -110,6 +110,8 @@ class AgentTaskRunner(TaskRunner):
         return event
     
     async def _get_browser_screenshot(self) -> str:
+        if self._browser is None:
+            raise RuntimeError("Browser tools are disabled")
         screenshot = await self._browser.screenshot()
         result = await self._file_storage.upload_file(screenshot, "screenshot.png", self._user_id)
         return result.file_id
@@ -431,13 +433,17 @@ class AgentTaskRunnerFactory(TaskRunnerFactory):
         }
 
     async def create_runner(self, params: Dict[str, Any]) -> AgentTaskRunner:
+        from app.core.config import get_settings
+
         sandbox_id = params["sandbox_id"]
         sandbox = await self._sandbox_cls.get(sandbox_id)
         if not sandbox:
             raise RuntimeError(f"Sandbox {sandbox_id} not found")
-        browser = await sandbox.get_browser()
-        if not browser:
-            raise RuntimeError(f"Failed to get browser for Sandbox {sandbox_id}")
+        browser = None
+        if get_settings().browser_enabled:
+            browser = await sandbox.get_browser()
+            if not browser:
+                raise RuntimeError(f"Failed to get browser for Sandbox {sandbox_id}")
         return AgentTaskRunner(
             session_id=params["session_id"],
             agent_id=params["agent_id"],

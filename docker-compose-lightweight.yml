@@ -1,0 +1,68 @@
+services:
+  frontend:
+    image: simpleyyt/manus-frontend:latest
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - manus-network
+    environment:
+      - BACKEND_URL=http://backend:8000
+
+  backend:
+    image: local/manus-backend-lightweight:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.lightweight
+    depends_on:
+      - sandbox
+      - mongodb
+      - redis
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - manus-network
+    env_file:
+      - .env
+    environment:
+      - BROWSER_ENABLED=false
+      - SANDBOX_IMAGE=local/manus-sandbox-lightweight:latest
+      - SANDBOX_MEM_LIMIT=256m
+      - SANDBOX_NANO_CPUS=500000000
+      - SANDBOX_PIDS_LIMIT=64
+
+  sandbox:
+    image: local/manus-sandbox-lightweight:latest
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile.lightweight
+    command: /bin/sh -c "exit 0"
+    restart: "no"
+    networks:
+      - manus-network
+
+  mongodb:
+    image: mongo:7.0
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+    networks:
+      - manus-network
+
+  redis:
+    image: redis:7.0
+    restart: unless-stopped
+    networks:
+      - manus-network
+
+volumes:
+  mongodb_data:
+    name: manus-mongodb-data
+
+networks:
+  manus-network:
+    name: manus-network
+    driver: bridge

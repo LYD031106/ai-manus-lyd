@@ -99,6 +99,8 @@ class DockerSandbox(Sandbox):
                 "name": container_name,
                 "detach": True,
                 "remove": True,
+                "security_opt": ["no-new-privileges:true"],
+                "cap_drop": ["ALL"],
                 "environment": {
                     "SERVICE_TIMEOUT_MINUTES": settings.sandbox_ttl_minutes,
                     "CHROME_ARGS": settings.sandbox_chrome_args,
@@ -107,6 +109,13 @@ class DockerSandbox(Sandbox):
                     "NO_PROXY": settings.sandbox_no_proxy
                 }
             }
+
+            if settings.sandbox_mem_limit:
+                container_config["mem_limit"] = settings.sandbox_mem_limit
+            if settings.sandbox_nano_cpus:
+                container_config["nano_cpus"] = settings.sandbox_nano_cpus
+            if settings.sandbox_pids_limit:
+                container_config["pids_limit"] = settings.sandbox_pids_limit
             
             # Add network to container config if configured
             if settings.sandbox_network:

@@ -60,8 +60,12 @@ class Settings(BaseSettings):
     sandbox_https_proxy: str | None = None
     sandbox_http_proxy: str | None = None
     sandbox_no_proxy: str | None = None
+    sandbox_mem_limit: str | None = "256m"
+    sandbox_nano_cpus: int | None = 500_000_000
+    sandbox_pids_limit: int | None = 64
 
     # Browser engine configuration
+    browser_enabled: bool = True
     browser_engine: str = "browser_use"  # "playwright" or "browser_use"
     
     # Search engine configuration

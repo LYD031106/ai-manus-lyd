@@ -1,0 +1,3 @@
+FROM simpleyyt/manus-backend:latest
+
+COPY app /app/app
