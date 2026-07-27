@@ -92,7 +92,7 @@ const handleSubmit = async () => {
 
 onMounted(async () => {
   const authProvider = await getCachedAuthProvider()
-  hasRegister.value = authProvider === 'password'
+  hasRegister.value = authProvider === 'password' || authProvider === 'local'
 })
 
 // Expose clearForm method for parent component

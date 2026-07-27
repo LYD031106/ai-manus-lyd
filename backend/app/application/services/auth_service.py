@@ -64,7 +64,7 @@ class AuthService:
         """Register a new user"""
         logger.info(f"Registering user: {email}")
 
-        if self.settings.auth_provider != "password":
+        if self.settings.auth_provider not in ("password", "local"):
             raise BadRequestError("Registration is not allowed")
         
         # Validate input
@@ -118,7 +118,8 @@ class AuthService:
             )
         
         elif self.settings.auth_provider == "local":
-            # Local authentication using configured credentials
+            # Keep the configured local administrator while also allowing
+            # database-backed accounts created through self-registration.
             if (email == self.settings.local_auth_email and 
                 password == self.settings.local_auth_password):
                 return User(
@@ -128,9 +129,19 @@ class AuthService:
                     role=UserRole.ADMIN,
                     is_active=True
                 )
-            else:
-                logger.warning(f"Local authentication failed for user: {email}")
+
+            user = await self.user_repository.get_user_by_email(email)
+            if not user or not user.is_active or not user.password_hash:
+                logger.warning(f"Local/database authentication failed for user: {email}")
                 return None
+            if not self._verify_password(password, user.password_hash):
+                logger.warning(f"Invalid password for registered user: {email}")
+                return None
+
+            user.update_last_login()
+            await self.user_repository.update_user(user)
+            logger.info(f"Registered user authenticated successfully: {email}")
+            return user
         
         elif self.settings.auth_provider == "password":
             # Database password authentication
@@ -352,4 +363,4 @@ class AuthService:
         await self.user_repository.update_user(user)
         
         logger.info(f"Password reset successfully for user: {email}")
-        return True 
+        return True
