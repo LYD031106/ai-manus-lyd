@@ -35,22 +35,25 @@ GML 的命名空间、几何图元链、`gml:id` 串联、`boundedBy`、`xlink:a
 
 绝不直接生成 `.gml` 文本。只生成 `featureset.json`，然后用脚本完成后续步骤。
 
-### ① 解析：调用 sandbox 工具
+### ① 解析：调用 parse_regulation 工具
 
-`parse_regulation` 是 sandbox 内置工具（处理 PDF/图片需要多模态 API），通过 tool call 调用：
+`parse_regulation` 是内置工具，直接通过 tool call 调用：
 
 ```
-parse_regulation(files=["通告.pdf", "附件1.docx", "附件2.pdf", "坐标.csv"], output="解析结果.md")
+parse_regulation(files=["/home/ubuntu/upload/通告.pdf", "/home/ubuntu/upload/附件1.docx", "/home/ubuntu/upload/坐标.csv"], output="/tmp/解析结果.md")
 
 # 只提坐标（跳过全文解析）
-parse_regulation(files=["坐标附件.pdf"], coords_only=true, output="coords.json")
+parse_regulation(files=["/home/ubuntu/upload/坐标附件.pdf"], coords_only=true, output="/tmp/coords.json")
 ```
 
 参数说明：
-- `files`（string[]，必填）：文件路径列表，支持 .pdf/.docx/.doc/.wps/.png/.jpg/.csv/.xlsx
-- `output`（string，必填）：输出文件路径
+- `files`（string[]，必填）：文件路径列表，用绝对路径。支持 .pdf/.docx/.png/.jpg/.csv/.xlsx
+- `output`（string，必填）：输出文件路径，用绝对路径
 - `coords_only`（bool，可选）：仅提取坐标，输出 JSON
 - `model`（string，可选）：覆盖默认模型
+
+一次可传多个文件，结果按文件分节合并写入 `output`，之后用文件工具读取。
+`.doc` / `.wps` 不支持，需先转成 `.docx`。
 
 ### ②~⑤ 后续步骤：调用本地脚本
 
@@ -91,17 +94,17 @@ python $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
 ## 七步工作流
 
 ### ① 解析源文件与识别专题
-用户上传的通常是**多个文件**：通告正文 PDF、附件 Word（.docx/.wps）、坐标表 CSV/Excel、
+用户上传的通常是**多个文件**：通告正文 PDF、附件 Word（.docx）、坐标表 CSV/Excel、
 示意图图片等。调用 `parse_regulation` 工具统一解析为 Markdown：
 
 ```
-parse_regulation(files=["通告.pdf", "附件1.docx", "附件2.pdf", "坐标.csv"], output="解析结果.md")
+parse_regulation(files=["/home/ubuntu/upload/通告.pdf", "/home/ubuntu/upload/附件1.docx", "/home/ubuntu/upload/坐标.csv"], output="/tmp/解析结果.md")
 ```
 
-- PDF / 图片：发送给多模态 API 解析（处理扫描件 OCR、图中坐标、表格）
-- Word (.docx)：本地提取文本和表格，内嵌图片发给 API
+- PDF / 图片：送多模态 API 解析（处理扫描件 OCR、图中坐标、表格）
+- Word (.docx)：本地提取文本和表格，内嵌图片一并送 API
 - CSV / Excel：本地解析为 Markdown 表格
-- .doc / .wps：尝试 LibreOffice 转换，失败则作为 PDF 发给 API
+- .doc / .wps：不支持，先用 shell 转成 .docx 再解析
 
 然后阅读解析结果 Markdown，确定：覆盖的地理范围、发文机构层级、属于哪个专题。
 专题决定要素配方 —— 见 `references/05-专题配方.md`，里面按七类专题给出了

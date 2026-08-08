@@ -152,12 +152,9 @@ def _parse_docx(data: bytes) -> Tuple[str, List[Tuple[bytes, str]]]:
         if not table.rows:
             continue
         lines.append("")
-        header = [cell.text.strip() for cell in table.rows[0].cells]
-        lines.append("| " + " | ".join(header) + " |")
-        lines.append("| " + " | ".join(["---"] * len(header)) + " |")
-        for row in table.rows[1:]:
-            cells = [cell.text.strip().replace("\n", " ") for cell in row.cells]
-            lines.append("| " + " | ".join(cells) + " |")
+        lines.append(_rows_to_markdown(
+            [[cell.text for cell in row.cells] for row in table.rows]
+        ))
         lines.append("")
 
     for rel in doc.part.rels.values():
@@ -171,12 +168,21 @@ def _parse_docx(data: bytes) -> Tuple[str, List[Tuple[bytes, str]]]:
     return "\n".join(lines), images
 
 
-def _rows_to_markdown(rows: List[List[str]]) -> str:
-    """二维单元格 → Markdown 表格。"""
+def _cell(value: Any) -> str:
+    """单元格 → Markdown 安全文本：换行压成空格，竖线转义，否则表格会散。"""
+    if value is None:
+        return ""
+    return str(value).replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
+
+
+def _rows_to_markdown(rows: List[List[Any]]) -> str:
+    """二维单元格 → Markdown 表格。按最宽的一行补齐列数。"""
     if not rows:
         return "(空文件)"
-    width = max(len(row) for row in rows)
-    padded = [list(row) + [""] * (width - len(row)) for row in rows]
+    width = max((len(row) for row in rows), default=0)
+    if width == 0:
+        return "(空文件)"
+    padded = [[_cell(c) for c in row] + [""] * (width - len(row)) for row in rows]
     lines = ["| " + " | ".join(padded[0]) + " |",
              "| " + " | ".join(["---"] * width) + " |"]
     lines.extend("| " + " | ".join(row) + " |" for row in padded[1:])
@@ -185,7 +191,7 @@ def _rows_to_markdown(rows: List[List[str]]) -> str:
 
 def _parse_csv(data: bytes) -> str:
     text = data.decode("utf-8-sig", errors="replace")
-    return _rows_to_markdown([row for row in csv.reader(io.StringIO(text))])
+    return _rows_to_markdown(list(csv.reader(io.StringIO(text))))
 
 
 def _parse_excel(data: bytes) -> str:
@@ -195,11 +201,7 @@ def _parse_excel(data: bytes) -> str:
     wb = load_workbook(io.BytesIO(data), data_only=True)
     parts: List[str] = []
     for ws in wb.worksheets:
-        rows = [
-            [str(cell) if cell is not None else "" for cell in row]
-            for row in ws.iter_rows(values_only=True)
-        ]
-        rows = [[cell.replace("\n", " ") for cell in row] for row in rows]
+        rows = [list(row) for row in ws.iter_rows(values_only=True)]
         if not rows:
             continue
         parts.append(f"### Sheet: {ws.title}\n{_rows_to_markdown(rows)}")
@@ -211,12 +213,11 @@ class ParseRegulationToolkit(BaseToolkit):
 
     name: str = "parse_regulation"
     instructions: str = """
-- 用 parse_regulation 把海事法规文件（PDF/Word/图片/表格）解析为结构化 Markdown
-- 支持格式：.pdf, .docx, .png, .jpg, .csv, .xlsx；一次可传多个文件，结果按文件分节合并
-- 输出包含：文件基本信息、正文、适用船舶、报告制度、坐标、图件说明
-- 只需要从附件里取地理坐标时用 coords_only=true，可跳过全文解析、节省时间
-- 输出的 Markdown 可直接用于编写 S-127 GML 数据集的要素清单 featureset.json
-- 解析结果会写入 output 指定的沙箱路径，之后用文件工具读取
+- 需要读取法规类 PDF / Word / 扫描件的内容时用本工具，不要用 shell 或文件工具读二进制
+- 支持 .pdf/.docx/.png/.jpg/.csv/.xlsx；一次可传多个文件，结果按文件分节合并写入 output
+- files 与 output 都用绝对路径；用户上传的附件在 /home/ubuntu/upload/ 下
+- 只需要地理坐标时加 coords_only=true，可跳过全文解析
+- 工具只负责产出 Markdown，解析完再用文件工具读 output 查看内容
 """
 
     def __init__(self, sandbox: Sandbox):
@@ -382,7 +383,11 @@ class ParseRegulationToolkit(BaseToolkit):
                 },
                 json=payload,
             )
-            response.raise_for_status()
+            if response.status_code >= 400:
+                # 带上响应体，否则网关的 400/404 只剩状态码，排查不了
+                raise RuntimeError(
+                    f"{base}/messages 返回 {response.status_code}：{response.text[:500]}"
+                )
             body = response.json()
 
         text = "".join(
