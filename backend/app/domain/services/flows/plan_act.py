@@ -28,6 +28,7 @@ from app.domain.services.tools.browser import BrowserToolkit
 from app.domain.services.tools.file import FileToolkit
 from app.domain.services.tools.message import MessageToolkit
 from app.domain.services.tools.search import SearchToolkit
+from app.domain.services.tools.parse_regulation import ParseRegulationToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,7 @@ class PlanActFlow(BaseFlow):
         tools = [
             ShellToolkit(sandbox),
             FileToolkit(sandbox),
+            ParseRegulationToolkit(sandbox),
             MessageToolkit(),
             mcp_tool
         ]

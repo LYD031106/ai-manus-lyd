@@ -138,6 +138,13 @@ class Settings(BaseSettings):
     # e.g. "redis://:password@redis:6379/0" or "amqp://user:pass@rabbitmq:5672//"
     celery_broker_url: str | None = None
 
+    # 法规解析工具配置（parse_regulation，用多模态 API 解析 PDF/图片）
+    # 未设置时回退到上面的 api_key / api_base
+    parse_api_key: str | None = None
+    parse_api_base: str | None = None
+    parse_model: str = "claude-sonnet-5"
+    parse_max_tokens: int = 16000
+
     # MCP configuration
     mcp_config_path: str = "/etc/mcp.json"
     

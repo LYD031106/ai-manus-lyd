@@ -1,0 +1,398 @@
+"""海事法规文件解析工具。
+
+把用户上传到沙箱的法规文件（PDF / Word / 图片 / 表格）解析成一份合并的
+Markdown，供后续生成 S-127 GML 数据集的要素清单使用。
+
+解析分两条路径：
+
+* Word / CSV / Excel —— 在后端本地提取文本与表格，不消耗 API token
+* PDF / 图片 —— 送多模态 API 解析（需要 OCR、表格识别、图件标注读取）
+
+文件通过沙箱的下载接口读入内存，结果通过沙箱的写入接口落回沙箱，
+因此沙箱镜像内不需要预装任何脚本或依赖。
+"""
+import asyncio
+import base64
+import csv
+import io
+import logging
+from pathlib import PurePosixPath
+from typing import Any, Dict, List, Optional, Tuple
+
+import httpx
+
+from app.core.config import get_settings
+from app.domain.external.sandbox import Sandbox
+from app.domain.models.tool_result import ToolResult
+from app.domain.services.tools.base import BaseToolkit, tool
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# 提示词
+# ---------------------------------------------------------------------------
+
+SYSTEM_PROMPT = """\
+你是海事法规文本提取专家。用户会给你一份或多份中国海事主管机关的法规文件（PDF 或图片），
+请按以下格式输出：
+
+## 文件基本信息
+- 发文机构：
+- 文号：
+- 印发日期：
+- 生效日期：
+- 失效日期（如有）：
+- 文件标题：
+
+## 正文
+逐条提取原文内容，保留条款编号（第X条/第X款）。对表格用 Markdown 表格格式。
+每一条独立段落，便于后续按条款溯源。
+
+## 适用船舶（如有）
+如果文件定义了适用船舶类别，逐项列出：
+- 类别名称
+- 判定条件（如有具体标准）
+- 出处条款
+
+## 报告制度（如有）
+如果文件规定了船舶报告制度，按报告类型分项：
+- 报告类型（驶入/抵达/变化/引航/其他）
+- 报告时机
+- 报告对象
+- 报告方式（VHF频道等）
+- 报告内容
+- 出处条款
+
+## 坐标（如有）
+如果文件包含地理坐标（经纬度），提取为 JSON 数组，格式：
+```json
+[{"name": "区域/点名称", "points": [[纬度, 经度], ...]}]
+```
+度分秒转十进制，精度 7 位。
+
+## 图件说明（如有）
+描述文件中包含的示意图、地图的内容与标注。
+
+注意：
+- 输出语言与原文一致（中文为主）
+- 坐标顺序为 [纬度, 经度]（与 S-127 GML 一致）
+- 如果 PDF 是扫描件或图片质量差，尽力提取，无法辨认的用 [?] 标注
+- 多个文件时，标注每段内容来自哪个文件（用文件名或文号标注）
+"""
+
+COORDS_PROMPT = """\
+这份文件是坐标附件。请只提取所有地理坐标，输出为 JSON 数组：
+```json
+[{"name": "区域/线/点名称", "points": [[纬度, 经度], ...]}]
+```
+度分秒转十进制，精度 7 位。坐标顺序 [纬度, 经度]。
+如果有多个区域/航路/报告线，按名称分组。
+"""
+
+
+# ---------------------------------------------------------------------------
+# 文件类型判断
+# ---------------------------------------------------------------------------
+
+_IMAGE_MIME = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+
+def _file_type(path: str) -> str:
+    """按后缀判断文件类型，决定走本地解析还是多模态 API。"""
+    suffix = PurePosixPath(path).suffix.lower()
+    if suffix == ".pdf":
+        return "pdf"
+    if suffix == ".docx":
+        return "docx"
+    if suffix in _IMAGE_MIME:
+        return "image"
+    if suffix == ".csv":
+        return "csv"
+    if suffix in (".xlsx", ".xlsm"):
+        return "excel"
+    return "unknown"
+
+
+# ---------------------------------------------------------------------------
+# 本地解析（Word / CSV / Excel）—— 同步函数，调用侧用线程池执行
+# ---------------------------------------------------------------------------
+
+def _parse_docx(data: bytes) -> Tuple[str, List[Tuple[bytes, str]]]:
+    """解析 .docx → (markdown_text, [(图片字节, mime), ...])。
+
+    正文与表格在本地提取；内嵌图片单独返回，由调用方并入多模态请求。
+    """
+    from docx import Document
+
+    doc = Document(io.BytesIO(data))
+    lines: List[str] = []
+    images: List[Tuple[bytes, str]] = []
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            lines.append("")
+            continue
+        style = para.style.name.lower() if para.style else ""
+        if "heading" in style:
+            # 从样式名里取出标题级别，如 "Heading 2" → 2
+            level = next((int(ch) for ch in style if ch.isdigit()), 1)
+            lines.append(f"{'#' * level} {text}")
+        else:
+            lines.append(text)
+
+    for table in doc.tables:
+        if not table.rows:
+            continue
+        lines.append("")
+        header = [cell.text.strip() for cell in table.rows[0].cells]
+        lines.append("| " + " | ".join(header) + " |")
+        lines.append("| " + " | ".join(["---"] * len(header)) + " |")
+        for row in table.rows[1:]:
+            cells = [cell.text.strip().replace("\n", " ") for cell in row.cells]
+            lines.append("| " + " | ".join(cells) + " |")
+        lines.append("")
+
+    for rel in doc.part.rels.values():
+        if "image" not in rel.reltype:
+            continue
+        try:
+            images.append((rel.target_part.blob, rel.target_part.content_type or "image/png"))
+        except Exception:  # 个别损坏的图片关系不应影响整篇解析
+            logger.warning("跳过一张无法读取的内嵌图片")
+
+    return "\n".join(lines), images
+
+
+def _rows_to_markdown(rows: List[List[str]]) -> str:
+    """二维单元格 → Markdown 表格。"""
+    if not rows:
+        return "(空文件)"
+    width = max(len(row) for row in rows)
+    padded = [list(row) + [""] * (width - len(row)) for row in rows]
+    lines = ["| " + " | ".join(padded[0]) + " |",
+             "| " + " | ".join(["---"] * width) + " |"]
+    lines.extend("| " + " | ".join(row) + " |" for row in padded[1:])
+    return "\n".join(lines)
+
+
+def _parse_csv(data: bytes) -> str:
+    text = data.decode("utf-8-sig", errors="replace")
+    return _rows_to_markdown([row for row in csv.reader(io.StringIO(text))])
+
+
+def _parse_excel(data: bytes) -> str:
+    """逐个工作表解析 .xlsx，公式取计算结果。"""
+    from openpyxl import load_workbook
+
+    wb = load_workbook(io.BytesIO(data), data_only=True)
+    parts: List[str] = []
+    for ws in wb.worksheets:
+        rows = [
+            [str(cell) if cell is not None else "" for cell in row]
+            for row in ws.iter_rows(values_only=True)
+        ]
+        rows = [[cell.replace("\n", " ") for cell in row] for row in rows]
+        if not rows:
+            continue
+        parts.append(f"### Sheet: {ws.title}\n{_rows_to_markdown(rows)}")
+    return "\n\n".join(parts) if parts else "(空表格)"
+
+
+class ParseRegulationToolkit(BaseToolkit):
+    """海事法规文件解析工具"""
+
+    name: str = "parse_regulation"
+    instructions: str = """
+- 用 parse_regulation 把海事法规文件（PDF/Word/图片/表格）解析为结构化 Markdown
+- 支持格式：.pdf, .docx, .png, .jpg, .csv, .xlsx；一次可传多个文件，结果按文件分节合并
+- 输出包含：文件基本信息、正文、适用船舶、报告制度、坐标、图件说明
+- 只需要从附件里取地理坐标时用 coords_only=true，可跳过全文解析、节省时间
+- 输出的 Markdown 可直接用于编写 S-127 GML 数据集的要素清单 featureset.json
+- 解析结果会写入 output 指定的沙箱路径，之后用文件工具读取
+"""
+
+    def __init__(self, sandbox: Sandbox):
+        """初始化法规解析工具
+
+        Args:
+            sandbox: 沙箱服务，用于读取源文件与写回解析结果
+        """
+        super().__init__()
+        self.sandbox = sandbox
+
+    @tool(parse_docstring=True)
+    async def parse_regulation(
+        self,
+        files: List[str],
+        output: str,
+        coords_only: Optional[bool] = False,
+        model: Optional[str] = None,
+    ) -> ToolResult:
+        """解析海事法规文件（PDF/Word/图片/表格）为结构化 Markdown 并写入沙箱。用于从通告、服务指南、坐标附件中提取法规正文、适用船舶类别、报告制度和地理坐标。
+
+        Args:
+            files: 待解析的文件路径列表，绝对路径（支持 .pdf/.docx/.png/.jpg/.csv/.xlsx）
+            output: 解析结果的输出路径，绝对路径（.md 或 .json）
+            coords_only: （可选）只提取坐标，输出 JSON 而非完整 Markdown
+            model: （可选）覆盖默认的 PDF/图片解析模型
+        """
+        if not files:
+            return ToolResult(success=False, message="files 不能为空")
+
+        sections: List[str] = []
+        api_files: List[Tuple[str, bytes]] = []      # 需要送 API 的 PDF/图片
+        api_images: List[Tuple[bytes, str]] = []     # Word 里抽出的内嵌图片
+        skipped: List[str] = []
+
+        for path in files:
+            try:
+                stream = await self.sandbox.file_download(path)
+                data = stream.read()
+            except Exception as exc:
+                logger.warning("下载文件失败 %s: %s", path, exc)
+                return ToolResult(success=False, message=f"无法读取文件 {path}：{exc}")
+
+            name = PurePosixPath(path).name
+            ftype = _file_type(path)
+
+            if ftype == "docx":
+                try:
+                    text, images = await asyncio.to_thread(_parse_docx, data)
+                except Exception as exc:
+                    logger.warning("解析 Word 失败 %s: %s", path, exc)
+                    return ToolResult(success=False, message=f"解析 Word 失败 {name}：{exc}")
+                sections.append(f"# [Word] {name}\n\n{text}")
+                api_images.extend(images)
+
+            elif ftype in ("csv", "excel"):
+                parser = _parse_csv if ftype == "csv" else _parse_excel
+                try:
+                    text = await asyncio.to_thread(parser, data)
+                except Exception as exc:
+                    logger.warning("解析表格失败 %s: %s", path, exc)
+                    return ToolResult(success=False, message=f"解析表格失败 {name}：{exc}")
+                sections.append(f"# [Table] {name}\n\n{text}")
+
+            elif ftype in ("pdf", "image"):
+                api_files.append((path, data))
+
+            else:
+                skipped.append(name)
+
+        # PDF、图片以及 Word 内嵌图片，合并成一次多模态请求
+        if api_files or api_images:
+            try:
+                text = await self._call_api(api_files, api_images, bool(coords_only), model)
+            except Exception as exc:
+                logger.exception("多模态解析失败")
+                return ToolResult(success=False, message=f"多模态解析失败：{exc}")
+            label = ", ".join(PurePosixPath(p).name for p, _ in api_files)
+            if api_images:
+                label = f"{label} + {len(api_images)} 张内嵌图片" if label else f"{len(api_images)} 张内嵌图片"
+            sections.append(f"# [API] {label}\n\n{text}")
+
+        if not sections:
+            return ToolResult(
+                success=False,
+                message=f"没有可解析的文件（不支持的格式：{', '.join(skipped)}）" if skipped
+                else "没有可解析的文件",
+            )
+
+        result = await self.sandbox.file_write(file=output, content="\n\n---\n\n".join(sections))
+        if not result.success:
+            return result
+
+        message = f"已解析 {len(files) - len(skipped)} 个文件，结果写入 {output}"
+        if skipped:
+            message += f"；已跳过不支持的格式：{', '.join(skipped)}"
+        return ToolResult(success=True, message=message, data={"output": output})
+
+    async def _call_api(
+        self,
+        files: List[Tuple[str, bytes]],
+        images: List[Tuple[bytes, str]],
+        coords_only: bool,
+        model: Optional[str],
+    ) -> str:
+        """把 PDF/图片送多模态 Messages API，返回提取出的文本。"""
+        settings = get_settings()
+        api_key = settings.parse_api_key or settings.api_key
+        if not api_key:
+            raise RuntimeError("未配置 PARSE_API_KEY 或 API_KEY，无法解析 PDF/图片")
+
+        base = (settings.parse_api_base or settings.api_base or "https://api.anthropic.com").rstrip("/")
+        if not base.endswith("/v1"):
+            base = f"{base}/v1"
+
+        content: List[Dict[str, Any]] = []
+        for path, data in files:
+            encoded = base64.standard_b64encode(data).decode("ascii")
+            suffix = PurePosixPath(path).suffix.lower()
+            if suffix in _IMAGE_MIME:
+                content.append({
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": _IMAGE_MIME[suffix], "data": encoded},
+                })
+            else:
+                content.append({
+                    "type": "document",
+                    "source": {"type": "base64", "media_type": "application/pdf", "data": encoded},
+                })
+
+        for data, mime in images:
+            content.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": mime if mime in _IMAGE_MIME.values() else "image/png",
+                    "data": base64.standard_b64encode(data).decode("ascii"),
+                },
+            })
+
+        content.append({
+            "type": "text",
+            "text": "请提取这份文件中的所有坐标。" if coords_only
+            else "请按要求提取这份法规文件的内容。",
+        })
+
+        payload = {
+            "model": model or settings.parse_model,
+            "max_tokens": settings.parse_max_tokens,
+            "system": COORDS_PROMPT if coords_only else SYSTEM_PROMPT,
+            "messages": [{"role": "user", "content": content}],
+        }
+
+        logger.info("parse_regulation: 送 %d 个文件 + %d 张图片到 %s",
+                    len(files), len(images), payload["model"])
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                f"{base}/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json=payload,
+            )
+            response.raise_for_status()
+            body = response.json()
+
+        text = "".join(
+            block.get("text", "")
+            for block in body.get("content", [])
+            if block.get("type") == "text"
+        )
+        usage = body.get("usage") or {}
+        logger.info("parse_regulation: 输入 %s tokens，输出 %s tokens",
+                    usage.get("input_tokens"), usage.get("output_tokens"))
+        if not text.strip():
+            raise RuntimeError("模型未返回任何文本内容")
+        return text
