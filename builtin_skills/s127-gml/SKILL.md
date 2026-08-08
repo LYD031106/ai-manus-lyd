@@ -19,9 +19,9 @@ description: >-
 |---|---|---|---|
 | **schema** | `schemas/S127FC.xml`（IHO，v1.0.1-20190628） | 允许什么：要素类、子元素顺序、必填/可选、多重性、枚举、几何类型 | `scripts/s127_catalogue.py`（自动生成，勿手改） |
 | **约定** | 《S-127数据生产与发布操作指南（修订版）》 | 约定怎么填：双语、命名、来源、不表达清单 | `scripts/s127_model.py` + `references/` |
-| **实证** | 13 个已通过二审并入库的真实数据集 | 生产上实际怎么做：枚举 code 的数值、CARIS 版式 | 已并入上面两层，可用 `--verify-corpus` 复核 |
+| **实证** | 13 个已通过二审并入库的真实数据集 | 生产上实际怎么做：枚举 code 的数值、CARIS 版式 | 已并入上面两层，可用 `--verify` 复核 |
 
-XSD 换版后重跑 `python3 /opt/skills/s127-gml/scripts/gen_s127_catalogue.py` 即可，不要手改生成物。
+要素目录换版后重跑 `python3 /opt/skills/s127-gml/scripts/gen_s127_catalogue.py` 即可，不要手改生成物。
 
 ## 核心原则：不要手写 GML
 

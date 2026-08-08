@@ -11,7 +11,7 @@
 version **1.0.0-20181129**，230 KB，42 个全局元素、72 个 complexType、53 个枚举类型。
 命名空间与 13 个生产数据集完全一致。
 
-**它给了什么**（都已抽成 `scripts/s127_schema.py`）：
+**它给了什么**（都已抽成 `scripts/s127_catalogue.py`）：
 要素类清单、每个要素类的子元素**顺序**与**多重性**（minOccurs/maxOccurs）、
 复合类型的嵌套结构、几何类型约束、枚举 label 全集、哪些角色能挂在哪个要素类上。
 
@@ -19,7 +19,7 @@ version **1.0.0-20181129**，230 KB，42 个全局元素、72 个 complexType、
 
 | 缺口 | 怎么解决 |
 |---|---|
-| 枚举的**数值 code**（XSD 只有 label） | 实测 882 处 `code="N"`，确认 **code = label 在 XSD 枚举列表中的 1-based 序号**（882/882 吻合）。`gen_s127_schema.py --verify-corpus` 可随时复核 |
+| 枚举的**数值 code**（XSD 只有 label） | 官方数值取自要素目录 S127FC.xml，每个取值自带 `code`；**不可按 1-based 序号推算**（431 个取值里 46 个不等）。实测 882 处 `code="N"` 与目录吻合 882/882，`gen_s127_catalogue.py --verify` 可随时复核 |
 | `code` 属性本身没在 XSD 里声明 | XSD 把枚举元素定义成纯 `xs:string` 限定，没有 `xs:attribute name="code"`。但全部生产数据都带 `code`，系统也照收 —— 说明系统未按这份 XSD 做严格校验。构建器保持输出 `code`（与生产数据一致） |
 | 伴随 schema 不在目录里 | `xs:include common.xsd`、`xs:import s100gmlbase.xsd / S100_gmlProfile.xsd / S100_gmlProfileLevels.xsd / s100gmlbaseExt.xsd` 都缺。缺的类型只有 `AbstractFeatureType`、`AbstractInformationType`（它们只贡献 `s100:featureObjectIdentifier`）和 6 个几何/数值基础类型，已在生成脚本里按 S-100 Part 10b 补齐 |
 | 无法做真正的 `xmllint --schema` 校验 | 因为伴随 schema 缺失。替代方案是 `validate_featureset.py` —— 用 XSD 抽出的表在 Python 里做等价检查（存在性、必填、多重性、枚举、几何类型） |
@@ -301,7 +301,7 @@ FIN 由 `dataset.featureIdStart` 起递增。**同一发布体系内 FIN 不应�
 ```
 
 `code` 与文本必须**成对匹配**。要素清单里只写 label，`build_gml.py` 从
-`scripts/s127_schema.py`（XSD 生成）查表补 `code` —— 手工改 GML 时最容易出的错
+`scripts/s127_catalogue.py`（XSD 生成）查表补 `code` —— 手工改 GML 时最容易出的错
 就是改了文本没改 code。全量对照表见 `03-枚举代码表.md`。
 
 注意 `code` 属性本身并未在这份 XSD 里声明（见 §零），但全部生产数据都带它，
