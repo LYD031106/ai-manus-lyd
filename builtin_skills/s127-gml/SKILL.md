@@ -21,7 +21,7 @@ description: >-
 | **约定** | 《S-127数据生产与发布操作指南（修订版）》 | 约定怎么填：双语、命名、来源、不表达清单 | `scripts/s127_model.py` + `references/` |
 | **实证** | 13 个已通过二审并入库的真实数据集 | 生产上实际怎么做：枚举 code 的数值、CARIS 版式 | 已并入上面两层，可用 `--verify-corpus` 复核 |
 
-XSD 换版后重跑 `python scripts/gen_s127_catalogue.py` 即可，不要手改生成物。
+XSD 换版后重跑 `python3 /opt/skills/s127-gml/scripts/gen_s127_catalogue.py` 即可，不要手改生成物。
 
 ## 核心原则：不要手写 GML
 
@@ -30,63 +30,78 @@ GML 的命名空间、几何图元链、`gml:id` 串联、`boundedBy`、`xlink:a
 
 ```
 多个 PDF/Word → ①解析为 MD → ②基于 MD 生成要素清单 JSON → ③校验 → ④构建 GML → ⑤记录表 → ⑥系统导入与补录
- （用户上传）    （parse_regulation）  （你的产出）            （脚本）   （脚本）    （脚本）    （人工）
+ （用户上传）  （parse_office+parse_regulation）（你的产出）      （脚本）   （脚本）    （脚本）    （人工）
 ```
 
 绝不直接生成 `.gml` 文本。只生成 `featureset.json`，然后用脚本完成后续步骤。
 
-### ① 解析：调用 parse_regulation 工具
+### ① 解析：按文件类型分两条路
 
-`parse_regulation` 是内置工具，直接通过 tool call 调用：
+| 文件类型 | 怎么处理 | 为什么 |
+|---|---|---|
+| Word / Excel / CSV | 沙箱内跑 `parse_office.py` | 确定性文本提取，快且不花 token |
+| PDF / 图片 | `parse_regulation` 工具 | 需要 OCR、表格识别、读图上的标注 |
+| Word 里的内嵌图片 | `parse_office.py` 导出 → 再交 `parse_regulation` | 示意图上的坐标只有模型读得出来 |
+
+```bash
+S=/opt/skills/s127-gml/scripts
+
+# Word / Excel / CSV 本地解析；Word 内嵌图片会一并导出，输出里会列出图片路径
+python3 $S/parse_office.py /home/ubuntu/upload/附件1.docx /home/ubuntu/upload/坐标.csv \
+        -o /home/ubuntu/解析-office.md
+```
 
 ```
-parse_regulation(files=["/home/ubuntu/upload/通告.pdf", "/home/ubuntu/upload/附件1.docx", "/home/ubuntu/upload/坐标.csv"], output="/tmp/解析结果.md")
+# PDF、图片，以及上一步导出的示意图
+parse_regulation(files=["/home/ubuntu/upload/通告.pdf",
+                        "/home/ubuntu/附件2示意图_img1.png"],
+                 output="/home/ubuntu/解析-pdf.md")
 
 # 只提坐标（跳过全文解析）
-parse_regulation(files=["/home/ubuntu/upload/坐标附件.pdf"], coords_only=true, output="/tmp/coords.json")
+parse_regulation(files=["/home/ubuntu/upload/坐标附件.pdf"], coords_only=true,
+                 output="/home/ubuntu/coords.json")
 ```
 
-参数说明：
-- `files`（string[]，必填）：文件路径列表，用绝对路径。支持 .pdf/.docx/.png/.jpg/.csv/.xlsx
-- `output`（string，必填）：输出文件路径，用绝对路径
+`parse_regulation` 参数：
+- `files`（string[]，必填）：绝对路径，**只接受** .pdf/.png/.jpg/.gif/.webp
+- `output`（string，必填）：输出文件路径，绝对路径
 - `coords_only`（bool，可选）：仅提取坐标，输出 JSON
 - `model`（string，可选）：覆盖默认模型
 
-一次可传多个文件，结果按文件分节合并写入 `output`，之后用文件工具读取。
-`.doc` / `.wps` 不支持，需先转成 `.docx`。
+两条路的产出都要读，合起来才是完整素材。`.doc` / `.wps` 两边都不支持，先转 `.docx`。
 
 ### ②~⑤ 后续步骤：调用本地脚本
 
 ```bash
-S=.cursor/skills/s127-gml/scripts
+S=/opt/skills/s127-gml/scripts
 
 # ② 你阅读 解析结果.md，生成 featureset.json
 
 # ③ 校验，改到 0 ERROR
-python $S/validate_featureset.py featureset.json
+python3 $S/validate_featureset.py featureset.json
 
 # ④ 构建 GML
-python $S/build_gml.py featureset.json \
+python3 $S/build_gml.py featureset.json \
        -o 127CN00XXX001.gml --assoc-csv 关联补录清单.csv
 
 # ⑤ 出记录表
-python $S/make_record_table.py featureset.json \
+python3 $S/make_record_table.py featureset.json \
        -o S-127要素生产与检查记录表.xlsx
 ```
 
 辅助脚本：
 
 ```bash
-python $S/gml_to_featureset.py 已归档.gml -o featureset.json   # GML 反解（存档同步）
-python $S/roundtrip_check.py '示例/**/*.gml'                    # 保真度回归自检
+python3 $S/gml_to_featureset.py 已归档.gml -o featureset.json   # GML 反解（存档同步）
+python3 $S/roundtrip_check.py '示例/**/*.gml'                    # 保真度回归自检
 ```
 
 坐标不要手抄，用脚本从原文或附件里提：
 
 ```bash
-python $S/coords.py --text 通告正文.txt --close        # 从正文抓度分秒
-python $S/coords.py --csv area.csv --group-col name --close   # 从坐标附件抓，按区域分组
-python $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
+python3 $S/coords.py --text 通告正文.txt --close        # 从正文抓度分秒
+python3 $S/coords.py --csv area.csv --group-col name --close   # 从坐标附件抓，按区域分组
+python3 $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
 ```
 
 > 输出的坐标一律是 `[纬度, 经度]`，与 S-127 GML 的 `posList` 轴序一致。**不要调换**。
@@ -95,15 +110,21 @@ python $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
 
 ### ① 解析源文件与识别专题
 用户上传的通常是**多个文件**：通告正文 PDF、附件 Word（.docx）、坐标表 CSV/Excel、
-示意图图片等。调用 `parse_regulation` 工具统一解析为 Markdown：
+示意图图片等。按上面 §① 的两条路分别解析：
 
-```
-parse_regulation(files=["/home/ubuntu/upload/通告.pdf", "/home/ubuntu/upload/附件1.docx", "/home/ubuntu/upload/坐标.csv"], output="/tmp/解析结果.md")
+```bash
+# 第一步：Office 文档本地解析，顺带导出 Word 里的示意图
+python3 /opt/skills/s127-gml/scripts/parse_office.py \
+        /home/ubuntu/upload/附件1.docx /home/ubuntu/upload/坐标.csv \
+        -o /home/ubuntu/解析-office.md
 ```
 
-- PDF / 图片：送多模态 API 解析（处理扫描件 OCR、图中坐标、表格）
-- Word (.docx)：本地提取文本和表格，内嵌图片一并送 API
+读一遍 `解析-office.md`，若里面列出了导出的图片路径，把它们和 PDF 一起交给
+`parse_regulation`（第二步）。
+
+- Word (.docx)：本地提文本与表格；**跨列合并的表会带告警**，涉及坐标务必对照原文核对
 - CSV / Excel：本地解析为 Markdown 表格
+- PDF / 图片 / Word 导出的示意图：`parse_regulation`（OCR、图中坐标、表格识别）
 - .doc / .wps：不支持，先用 shell 转成 .docx 再解析
 
 然后阅读解析结果 Markdown，确定：覆盖的地理范围、发文机构层级、属于哪个专题。

@@ -1,20 +1,13 @@
-"""海事法规文件解析工具。
+"""海事法规 PDF / 图片解析工具。
 
-把用户上传到沙箱的法规文件（PDF / Word / 图片 / 表格）解析成一份合并的
-Markdown，供后续生成 S-127 GML 数据集的要素清单使用。
+把沙箱里的 PDF 或图片送多模态 API，提取成结构化 Markdown 再写回沙箱。
+只处理确实需要模型的格式 —— 扫描件 OCR、表格结构识别、读图上的坐标标注。
 
-解析分两条路径：
-
-* Word / CSV / Excel —— 在后端本地提取文本与表格，不消耗 API token
-* PDF / 图片 —— 送多模态 API 解析（需要 OCR、表格识别、图件标注读取）
-
-文件通过沙箱的下载接口读入内存，结果通过沙箱的写入接口落回沙箱，
-因此沙箱镜像内不需要预装任何脚本或依赖。
+Word / Excel / CSV 不走本工具：那是确定性的文本提取，在沙箱内用
+`/opt/skills/s127-gml/scripts/parse_office.py` 直接跑，不必消耗 API token。
+Word 里的内嵌图片由该脚本导出成图片文件后，再回到本工具解析。
 """
-import asyncio
 import base64
-import csv
-import io
 import logging
 from pathlib import PurePosixPath
 from typing import Any, Dict, List, Optional, Tuple
@@ -28,10 +21,6 @@ from app.domain.services.tools.base import BaseToolkit, tool
 
 logger = logging.getLogger(__name__)
 
-
-# ---------------------------------------------------------------------------
-# 提示词
-# ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = """\
 你是海事法规文本提取专家。用户会给你一份或多份中国海事主管机关的法规文件（PDF 或图片），
@@ -90,11 +79,7 @@ COORDS_PROMPT = """\
 如果有多个区域/航路/报告线，按名称分组。
 """
 
-
-# ---------------------------------------------------------------------------
-# 文件类型判断
-# ---------------------------------------------------------------------------
-
+# 可直接作为 image 块发送的格式；其余按 PDF 处理
 _IMAGE_MIME = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -103,125 +88,27 @@ _IMAGE_MIME = {
     ".webp": "image/webp",
 }
 
-
-def _file_type(path: str) -> str:
-    """按后缀判断文件类型，决定走本地解析还是多模态 API。"""
-    suffix = PurePosixPath(path).suffix.lower()
-    if suffix == ".pdf":
-        return "pdf"
-    if suffix == ".docx":
-        return "docx"
-    if suffix in _IMAGE_MIME:
-        return "image"
-    if suffix == ".csv":
-        return "csv"
-    if suffix in (".xlsx", ".xlsm"):
-        return "excel"
-    return "unknown"
-
-
-# ---------------------------------------------------------------------------
-# 本地解析（Word / CSV / Excel）—— 同步函数，调用侧用线程池执行
-# ---------------------------------------------------------------------------
-
-def _parse_docx(data: bytes) -> Tuple[str, List[Tuple[bytes, str]]]:
-    """解析 .docx → (markdown_text, [(图片字节, mime), ...])。
-
-    正文与表格在本地提取；内嵌图片单独返回，由调用方并入多模态请求。
-    """
-    from docx import Document
-
-    doc = Document(io.BytesIO(data))
-    lines: List[str] = []
-    images: List[Tuple[bytes, str]] = []
-
-    for para in doc.paragraphs:
-        text = para.text.strip()
-        if not text:
-            lines.append("")
-            continue
-        style = para.style.name.lower() if para.style else ""
-        if "heading" in style:
-            # 从样式名里取出标题级别，如 "Heading 2" → 2
-            level = next((int(ch) for ch in style if ch.isdigit()), 1)
-            lines.append(f"{'#' * level} {text}")
-        else:
-            lines.append(text)
-
-    for table in doc.tables:
-        if not table.rows:
-            continue
-        lines.append("")
-        lines.append(_rows_to_markdown(
-            [[cell.text for cell in row.cells] for row in table.rows]
-        ))
-        lines.append("")
-
-    for rel in doc.part.rels.values():
-        if "image" not in rel.reltype:
-            continue
-        try:
-            images.append((rel.target_part.blob, rel.target_part.content_type or "image/png"))
-        except Exception:  # 个别损坏的图片关系不应影响整篇解析
-            logger.warning("跳过一张无法读取的内嵌图片")
-
-    return "\n".join(lines), images
-
-
-def _cell(value: Any) -> str:
-    """单元格 → Markdown 安全文本：换行压成空格，竖线转义，否则表格会散。"""
-    if value is None:
-        return ""
-    return str(value).replace("\r", " ").replace("\n", " ").replace("|", "\\|").strip()
-
-
-def _rows_to_markdown(rows: List[List[Any]]) -> str:
-    """二维单元格 → Markdown 表格。按最宽的一行补齐列数。"""
-    if not rows:
-        return "(空文件)"
-    width = max((len(row) for row in rows), default=0)
-    if width == 0:
-        return "(空文件)"
-    padded = [[_cell(c) for c in row] + [""] * (width - len(row)) for row in rows]
-    lines = ["| " + " | ".join(padded[0]) + " |",
-             "| " + " | ".join(["---"] * width) + " |"]
-    lines.extend("| " + " | ".join(row) + " |" for row in padded[1:])
-    return "\n".join(lines)
-
-
-def _parse_csv(data: bytes) -> str:
-    text = data.decode("utf-8-sig", errors="replace")
-    return _rows_to_markdown(list(csv.reader(io.StringIO(text))))
-
-
-def _parse_excel(data: bytes) -> str:
-    """逐个工作表解析 .xlsx，公式取计算结果。"""
-    from openpyxl import load_workbook
-
-    wb = load_workbook(io.BytesIO(data), data_only=True)
-    parts: List[str] = []
-    for ws in wb.worksheets:
-        rows = [list(row) for row in ws.iter_rows(values_only=True)]
-        if not rows:
-            continue
-        parts.append(f"### Sheet: {ws.title}\n{_rows_to_markdown(rows)}")
-    return "\n\n".join(parts) if parts else "(空表格)"
+_OFFICE_SUFFIXES = {".docx", ".doc", ".wps", ".csv", ".xlsx", ".xls", ".xlsm"}
 
 
 class ParseRegulationToolkit(BaseToolkit):
-    """海事法规文件解析工具"""
+    """海事法规 PDF / 图片解析工具"""
 
     name: str = "parse_regulation"
     instructions: str = """
-- 需要读取法规类 PDF / Word / 扫描件的内容时用本工具，不要用 shell 或文件工具读二进制
-- 支持 .pdf/.docx/.png/.jpg/.csv/.xlsx；一次可传多个文件，结果按文件分节合并写入 output
+- 需要读取 PDF 或图片（扫描件、示意图）的内容时用本工具，不要用 shell 或文件工具读二进制
+- 只接受 .pdf / .png / .jpg / .gif / .webp；一次可传多个文件，结果合并写入 output
+- Word / Excel / CSV 不要用本工具，本地解析更快也不花 token，改用 shell 跑
+  `python3 /opt/skills/s127-gml/scripts/parse_office.py <文件...> -o <输出.md>`
+- Word 里有内嵌图片时，上面那个脚本会把图导出并在输出里列出路径，
+  再用本工具解析那些图片，才能拿到示意图上的坐标与范围标注
 - files 与 output 都用绝对路径；用户上传的附件在 /home/ubuntu/upload/ 下
 - 只需要地理坐标时加 coords_only=true，可跳过全文解析
 - 工具只负责产出 Markdown，解析完再用文件工具读 output 查看内容
 """
 
     def __init__(self, sandbox: Sandbox):
-        """初始化法规解析工具
+        """初始化解析工具
 
         Args:
             sandbox: 沙箱服务，用于读取源文件与写回解析结果
@@ -237,93 +124,71 @@ class ParseRegulationToolkit(BaseToolkit):
         coords_only: Optional[bool] = False,
         model: Optional[str] = None,
     ) -> ToolResult:
-        """解析海事法规文件（PDF/Word/图片/表格）为结构化 Markdown 并写入沙箱。用于从通告、服务指南、坐标附件中提取法规正文、适用船舶类别、报告制度和地理坐标。
+        """用多模态模型解析 PDF 或图片，提取为结构化 Markdown 并写入沙箱。用于从法规通告、服务指南、坐标附件、示意图中提取正文、适用船舶类别、报告制度和地理坐标。
 
         Args:
-            files: 待解析的文件路径列表，绝对路径（支持 .pdf/.docx/.png/.jpg/.csv/.xlsx）
+            files: 待解析的文件路径列表，绝对路径，只支持 .pdf/.png/.jpg/.gif/.webp
             output: 解析结果的输出路径，绝对路径（.md 或 .json）
             coords_only: （可选）只提取坐标，输出 JSON 而非完整 Markdown
-            model: （可选）覆盖默认的 PDF/图片解析模型
+            model: （可选）覆盖默认的解析模型
         """
         if not files:
             return ToolResult(success=False, message="files 不能为空")
 
-        sections: List[str] = []
-        api_files: List[Tuple[str, bytes]] = []      # 需要送 API 的 PDF/图片
-        api_images: List[Tuple[bytes, str]] = []     # Word 里抽出的内嵌图片
-        skipped: List[str] = []
+        # 先校验格式，避免下载完才发现不支持
+        for path in files:
+            suffix = PurePosixPath(path).suffix.lower()
+            if suffix in _OFFICE_SUFFIXES:
+                return ToolResult(
+                    success=False,
+                    message=f"{PurePosixPath(path).name} 是 Office 文档，本工具不处理。请用 shell 执行："
+                            f"python3 /opt/skills/s127-gml/scripts/parse_office.py "
+                            f"{path} -o <输出.md>"
+                            f"（该脚本会把 Word 内嵌图片导出，再用本工具解析导出的图片）",
+                )
+            if suffix != ".pdf" and suffix not in _IMAGE_MIME:
+                return ToolResult(
+                    success=False,
+                    message=f"不支持的格式 {suffix or '(无后缀)'}：{PurePosixPath(path).name}。"
+                            f"本工具只接受 .pdf 与 .png/.jpg/.gif/.webp",
+                )
 
+        loaded: List[Tuple[str, bytes]] = []
         for path in files:
             try:
                 stream = await self.sandbox.file_download(path)
-                data = stream.read()
+                loaded.append((path, stream.read()))
             except Exception as exc:
                 logger.warning("下载文件失败 %s: %s", path, exc)
                 return ToolResult(success=False, message=f"无法读取文件 {path}：{exc}")
 
-            name = PurePosixPath(path).name
-            ftype = _file_type(path)
+        try:
+            text = await self._call_api(loaded, bool(coords_only), model)
+        except Exception as exc:
+            logger.exception("多模态解析失败")
+            return ToolResult(success=False, message=f"多模态解析失败：{exc}")
 
-            if ftype == "docx":
-                try:
-                    text, images = await asyncio.to_thread(_parse_docx, data)
-                except Exception as exc:
-                    logger.warning("解析 Word 失败 %s: %s", path, exc)
-                    return ToolResult(success=False, message=f"解析 Word 失败 {name}：{exc}")
-                sections.append(f"# [Word] {name}\n\n{text}")
-                api_images.extend(images)
-
-            elif ftype in ("csv", "excel"):
-                parser = _parse_csv if ftype == "csv" else _parse_excel
-                try:
-                    text = await asyncio.to_thread(parser, data)
-                except Exception as exc:
-                    logger.warning("解析表格失败 %s: %s", path, exc)
-                    return ToolResult(success=False, message=f"解析表格失败 {name}：{exc}")
-                sections.append(f"# [Table] {name}\n\n{text}")
-
-            elif ftype in ("pdf", "image"):
-                api_files.append((path, data))
-
-            else:
-                skipped.append(name)
-
-        # PDF、图片以及 Word 内嵌图片，合并成一次多模态请求
-        if api_files or api_images:
-            try:
-                text = await self._call_api(api_files, api_images, bool(coords_only), model)
-            except Exception as exc:
-                logger.exception("多模态解析失败")
-                return ToolResult(success=False, message=f"多模态解析失败：{exc}")
-            label = ", ".join(PurePosixPath(p).name for p, _ in api_files)
-            if api_images:
-                label = f"{label} + {len(api_images)} 张内嵌图片" if label else f"{len(api_images)} 张内嵌图片"
-            sections.append(f"# [API] {label}\n\n{text}")
-
-        if not sections:
-            return ToolResult(
-                success=False,
-                message=f"没有可解析的文件（不支持的格式：{', '.join(skipped)}）" if skipped
-                else "没有可解析的文件",
-            )
-
-        result = await self.sandbox.file_write(file=output, content="\n\n---\n\n".join(sections))
+        result = await self.sandbox.file_write(file=output, content=text)
         if not result.success:
             return result
 
-        message = f"已解析 {len(files) - len(skipped)} 个文件，结果写入 {output}"
-        if skipped:
-            message += f"；已跳过不支持的格式：{', '.join(skipped)}"
-        return ToolResult(success=True, message=message, data={"output": output})
+        return ToolResult(
+            success=True,
+            message=f"已解析 {len(loaded)} 个文件，结果写入 {output}",
+            data={"output": output},
+        )
 
     async def _call_api(
         self,
         files: List[Tuple[str, bytes]],
-        images: List[Tuple[bytes, str]],
         coords_only: bool,
         model: Optional[str],
     ) -> str:
-        """把 PDF/图片送多模态 Messages API，返回提取出的文本。"""
+        """把文件内容以 base64 塞进 Messages API 请求体，返回提取出的文本。
+
+        注意送出去的是文件字节的 base64，不是路径或链接 —— 沙箱内的路径
+        对外部服务不可达。
+        """
         settings = get_settings()
         api_key = settings.parse_api_key or settings.api_key
         if not api_key:
@@ -335,8 +200,11 @@ class ParseRegulationToolkit(BaseToolkit):
 
         content: List[Dict[str, Any]] = []
         for path, data in files:
-            encoded = base64.standard_b64encode(data).decode("ascii")
+            name = PurePosixPath(path).name
             suffix = PurePosixPath(path).suffix.lower()
+            encoded = base64.standard_b64encode(data).decode("ascii")
+            # 每份材料前先报文件名，否则多文件时模型无法标注内容出自哪一份
+            content.append({"type": "text", "text": f"以下是文件《{name}》："})
             if suffix in _IMAGE_MIME:
                 content.append({
                     "type": "image",
@@ -347,16 +215,6 @@ class ParseRegulationToolkit(BaseToolkit):
                     "type": "document",
                     "source": {"type": "base64", "media_type": "application/pdf", "data": encoded},
                 })
-
-        for data, mime in images:
-            content.append({
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": mime if mime in _IMAGE_MIME.values() else "image/png",
-                    "data": base64.standard_b64encode(data).decode("ascii"),
-                },
-            })
 
         content.append({
             "type": "text",
@@ -371,8 +229,7 @@ class ParseRegulationToolkit(BaseToolkit):
             "messages": [{"role": "user", "content": content}],
         }
 
-        logger.info("parse_regulation: 送 %d 个文件 + %d 张图片到 %s",
-                    len(files), len(images), payload["model"])
+        logger.info("parse_regulation: 送 %d 个文件到 %s", len(files), payload["model"])
         async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(
                 f"{base}/messages",
