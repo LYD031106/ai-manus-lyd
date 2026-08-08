@@ -29,15 +29,18 @@ WORKDIR /app
 RUN pip install --no-cache-dir \
     "email-validator>=2.3.0" \
     "fastapi>=0.121.2" \
+    "openpyxl>=3.1.5" \
     "pydantic>=2.12.4" \
     "pydantic-settings>=2.12.0" \
     "python-multipart>=0.0.20" \
     "uvicorn>=0.38.0"
 
-COPY app ./app
-COPY supervisord.lightweight.conf /etc/supervisor/conf.d/app.conf
+COPY sandbox/app ./app
+COPY sandbox/supervisord.lightweight.conf /etc/supervisor/conf.d/app.conf
+COPY builtin_skills/s127-gml /opt/skills/s127-gml
 
-RUN chown -R ubuntu:ubuntu /app /etc/supervisor/conf.d/app.conf
+RUN chmod +x /opt/skills/s127-gml/scripts/*.py \
+    && chown -R ubuntu:ubuntu /app /opt/skills /etc/supervisor/conf.d/app.conf
 
 USER ubuntu
 

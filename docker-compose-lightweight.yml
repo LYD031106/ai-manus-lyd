@@ -17,8 +17,8 @@ services:
   backend:
     image: local/manus-backend-lightweight:latest
     build:
-      context: ./backend
-      dockerfile: Dockerfile.lightweight
+      context: .
+      dockerfile: backend/Dockerfile.lightweight
     depends_on:
       - sandbox
       - mongodb
@@ -40,8 +40,8 @@ services:
   sandbox:
     image: local/manus-sandbox-lightweight:latest
     build:
-      context: ./sandbox
-      dockerfile: Dockerfile.lightweight
+      context: .
+      dockerfile: sandbox/Dockerfile.lightweight
     command: /bin/sh -c "exit 0"
     restart: "no"
     networks:

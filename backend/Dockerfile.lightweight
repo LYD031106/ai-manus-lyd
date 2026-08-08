@@ -1,3 +1,5 @@
-FROM simpleyyt/manus-backend:latest
+ARG BACKEND_BASE_IMAGE=simpleyyt/manus-backend:latest
+FROM ${BACKEND_BASE_IMAGE}
 
-COPY app /app/app
+COPY backend/app /app/app
+COPY builtin_skills/s127-gml/SKILL.md /app/builtin_skills/s127-gml/SKILL.md

@@ -14,9 +14,36 @@ This replaces the previous monolithic hardcoded prompt, which shipped rules
 for tools that were not always available and could drift out of sync with the
 toolset.
 """
+import logging
+from pathlib import Path
 from typing import List, Optional
 
 from app.domain.services.tools.base import BaseToolkit
+
+logger = logging.getLogger(__name__)
+
+BUILTIN_SKILL_PATH = Path("/app/builtin_skills/s127-gml/SKILL.md")
+
+
+def _load_builtin_skill() -> str:
+    try:
+        content = BUILTIN_SKILL_PATH.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        logger.warning("Built-in s127-gml skill could not be loaded: %s", exc)
+        return ""
+    if not content:
+        return ""
+    return (
+        '<builtin_skill name="s127-gml">\n'
+        "This skill is built into every conversation sandbox. Its runtime root is "
+        "`/opt/skills/s127-gml`. Resolve every relative path and every legacy "
+        "`.cursor/skills/s127-gml` path in the skill against that runtime root.\n\n"
+        f"{content}\n"
+        "</builtin_skill>"
+    )
+
+
+BUILTIN_SKILL_PROMPT = _load_builtin_skill()
 
 CORE_PROMPT = """
 You are Manus, a general-purpose AI agent created by the Manus team.
@@ -86,6 +113,8 @@ def build_system_prompt(
             ``Project.instruction``.
     """
     sections = [CORE_PROMPT]
+    if BUILTIN_SKILL_PROMPT:
+        sections.append(BUILTIN_SKILL_PROMPT)
     for toolkit in toolkits or []:
         instructions = (toolkit.instructions or "").strip()
         if instructions:

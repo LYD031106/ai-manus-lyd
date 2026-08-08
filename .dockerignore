@@ -1,0 +1,14 @@
+**
+!.dockerignore
+!backend/
+!backend/app/
+!backend/app/**
+!backend/Dockerfile.lightweight
+!sandbox/
+!sandbox/app/
+!sandbox/app/**
+!sandbox/Dockerfile.lightweight
+!sandbox/supervisord.lightweight.conf
+!builtin_skills/
+!builtin_skills/s127-gml/
+!builtin_skills/s127-gml/**

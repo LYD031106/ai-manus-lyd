@@ -1,0 +1,378 @@
+{
+  "$comment": "要素清单骨架。删掉用不到的要素，按 references/05-专题配方.md 增补。所有 // 注释在正式文件里要删掉（JSON 不支持注释）。",
+  "dataset": {
+    "name": "127CN00XXYYY001",
+    "referenceDate": "2026-01-01",
+    "updateNumber": 0,
+    "agency": "CN",
+    "featureIdStart": 1
+  },
+  "common": {
+    "fixedDateRange": {
+      "dateStart": "2026-01-01",
+      "dateEnd": "2031-12-31"
+    },
+    "sourceIndication": {
+      "categoryOfAuthority": "maritime",
+      "countryName": "China",
+      "reportedDate": "2025-12-01",
+      "source": [
+        "XXX MSA Notice No.0001/2026",
+        "X航通〔2026〕0001号"
+      ],
+      "sourceType": "official publication",
+      "featureName": {
+        "eng": "XXX MSA",
+        "zho": "XX海事局"
+      }
+    }
+  },
+  "geometries": {
+    "g-area1": {
+      "type": "surface",
+      "exterior": [
+        [
+          39.1167444,
+          117.9030833
+        ],
+        [
+          39.0100333,
+          117.9890833
+        ],
+        [
+          38.9701944,
+          118.1769167
+        ],
+        [
+          39.1167444,
+          117.9030833
+        ]
+      ]
+    },
+    "g-line1": {
+      "type": "curve",
+      "coordinates": [
+        [
+          39.1697556,
+          117.8445139
+        ],
+        [
+          39.0386611,
+          117.8691667
+        ]
+      ]
+    }
+  },
+  "features": [
+    {
+      "ref": "auth-1",
+      "type": "Authority",
+      "reusable": true,
+      "featureName": {
+        "eng": "XXX MSA",
+        "zho": "XX海事局"
+      },
+      "attributes": {
+        "categoryOfAuthority": "maritime"
+      }
+    },
+    {
+      "ref": "cd-eng",
+      "type": "ContactDetails",
+      "reusable": true,
+      "$comment": "ContactDetails 是单语要素：language 定的是哪种语言，所有非枚举属性就只用那种语言。机构支持双语时建两个（cd-eng / cd-zho）。",
+      "featureName": {
+        "eng": "XXX VTS Centre"
+      },
+      "attributes": {
+        "language": "eng",
+        "communicationChannel": [
+          "VHF CH09"
+        ],
+        "contactAddress": {
+          "deliveryPoint": "No.1 Example Road",
+          "cityName": "Example City",
+          "administrativeDivision": "Example Province",
+          "countryName": "China",
+          "postalCode": "100000"
+        },
+        "telecommunications": [
+          {
+            "telecommunicationIdentifier": "+86-000-00000000",
+            "telecommunicationService": "voice"
+          }
+        ],
+        "radiocommunications": [
+          {
+            "categoryOfCommPref": "preferred calling",
+            "categoryOfRadioMethods": "Very High Frequency (VHF) voice traffic",
+            "communicationChannel": "09",
+            "contactInstructions": "Sector I"
+          }
+        ]
+      }
+    },
+    {
+      "ref": "cd-zho",
+      "type": "ContactDetails",
+      "reusable": true,
+      "featureName": {
+        "zho": "XX交管中心"
+      },
+      "attributes": {
+        "language": "zho",
+        "communicationChannel": [
+          "VHF CH09"
+        ],
+        "contactAddress": {
+          "deliveryPoint": "示例路1号",
+          "cityName": "示例市",
+          "administrativeDivision": "示例省",
+          "countryName": "中国",
+          "postalCode": "100000"
+        },
+        "telecommunications": [
+          {
+            "telecommunicationIdentifier": "+86-000-00000000",
+            "telecommunicationService": "voice"
+          }
+        ],
+        "radiocommunications": [
+          {
+            "categoryOfCommPref": "preferred calling",
+            "categoryOfRadioMethods": "Very High Frequency (VHF) voice traffic",
+            "communicationChannel": "09",
+            "contactInstructions": "第一分区"
+          }
+        ]
+      }
+    },
+    {
+      "ref": "sh-24h",
+      "type": "ServiceHours",
+      "reusable": true,
+      "featureName": {
+        "eng": "24-Hour Watch",
+        "zho": "24小时值班"
+      },
+      "attributes": {
+        "scheduleByDayOfWeek": {
+          "categoryOfSchedule": "normal operation",
+          "timeIntervalsByDayOfWeek": {
+            "dayOfWeek": [
+              "Sunday",
+              "Saturday"
+            ],
+            "dayOfWeekIsRange": true,
+            "timeOfDayStart": "00:00:00",
+            "timeOfDayEnd": "24:00:00"
+          }
+        }
+      }
+    },
+    {
+      "ref": "applic-fishing",
+      "type": "Applicability",
+      "reusable": true,
+      "featureName": {
+        "eng": "Fishing Vessels",
+        "zho": "渔船"
+      },
+      "attributes": {
+        "categoryOfVessel": "fishing vessel"
+      }
+    },
+    {
+      "ref": "applic-cn300",
+      "type": "Applicability",
+      "reusable": true,
+      "featureName": {
+        "eng": "Chinese-flagged Ships of 300 Gross Tonnage and Above",
+        "zho": "300总吨及以上的中国籍船舶"
+      },
+      "attributes": {
+        "categoryOfVesselRegistry": "domestic",
+        "logicalConnectives": "logical conjunction",
+        "vesselsMeasurements": [
+          {
+            "comparisonOperator": "greater than or equal to",
+            "vesselsCharacteristics": "gross tonnage",
+            "vesselsCharacteristicsValue": 300,
+            "vesselsCharacteristicsUnit": "gross ton"
+          }
+        ]
+      }
+    },
+    {
+      "ref": "vtsa-1",
+      "type": "VesselTrafficServiceArea",
+      "clause": "第二十四条；第二十六条",
+      "featureName": {
+        "eng": "XXX VTS Area",
+        "zho": "XX VTS区域"
+      },
+      "attributes": {
+        "categoryOfVesselTrafficService": [
+          "Information Service",
+          "Traffic Organisation Service"
+        ],
+        "requirementsForMaintenanceOfListeningWatch": [
+          "maintain a continuous listening watch on VHF09",
+          "在VHF09频道上保持守听"
+        ]
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "headline": {
+                "eng": "Navigation Rules",
+                "zho": "航行规则"
+              },
+              "text": {
+                "eng": "…",
+                "zho": "…"
+              }
+            }
+          ]
+        }
+      ],
+      "geometry": "g-area1",
+      "associations": [
+        {
+          "role": "controlAuthority",
+          "target": "auth-1"
+        },
+        {
+          "role": "theContactDetails",
+          "target": "cd-eng"
+        },
+        {
+          "role": "permission",
+          "target": "applic-cn300",
+          "permission": "required",
+          "source": "第六条"
+        },
+        {
+          "role": "reptForTrafficServ",
+          "target": "sr-plan"
+        },
+        {
+          "role": "consistsOf",
+          "target": "rcip-1"
+        },
+        {
+          "role": "theContactDetails",
+          "target": "cd-zho"
+        }
+      ]
+    },
+    {
+      "ref": "rcip-1",
+      "type": "RadioCallingInPoint",
+      "clause": "第七条",
+      "featureName": {
+        "eng": "XXX VTS Report Line",
+        "zho": "XX VTS报告线"
+      },
+      "attributes": {
+        "communicationChannel": [
+          "VHF09"
+        ],
+        "trafficFlow": "two-way"
+      },
+      "geometry": "g-line1",
+      "associations": [
+        {
+          "role": "permission",
+          "target": "applic-cn300",
+          "permission": "required",
+          "source": "第七条"
+        },
+        {
+          "role": "componentOf",
+          "target": "vtsa-1",
+          "$comment": "报告线通过聚合关联到 VTSA，间接获得主管机构与联系机构（指南 5.7(3)）；S127.xsd 里 RadioCallingInPoint 没有 controlAuthority"
+        }
+      ]
+    },
+    {
+      "ref": "sr-plan",
+      "type": "ShipReport",
+      "clause": "第五条；第九条",
+      "featureName": {
+        "eng": "XXX Ship's Sailing Plan Report",
+        "zho": "XX船舶航行计划报告"
+      },
+      "attributes": {
+        "categoryOfShipReport": [
+          "sailing plan"
+        ],
+        "imoFormatForReporting": false,
+        "noticeTime": [
+          {
+            "noticeTimeHours": 0
+          }
+        ]
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "headline": {
+                "eng": "Entry Report",
+                "zho": "进港报告"
+              },
+              "text": {
+                "eng": "WHEN: Passing the VTS report line. TO: XXX VTS. VIA: VHF CH09. GIVING: ship's name/call sign; movement; cargo/passenger on board; ship's draft.",
+                "zho": "报告时机：通过报告线。报告：XX交管中心。报告方式：VHF CH09。报告内容：船舶（船名、呼号）、动态、载货（客）情况、吃水。"
+              }
+            }
+          ]
+        }
+      ],
+      "associations": [
+        {
+          "role": "reportTo",
+          "target": "auth-1",
+          "$comment": "ShipReport 用 reportTo 指向报告对象机构，不是 controlAuthority"
+        }
+      ]
+    },
+    {
+      "ref": "reg-1",
+      "type": "Restrictions",
+      "clause": "第十九条",
+      "featureName": {
+        "eng": "XXX Fairway Navigation Rules",
+        "zho": "XX航道通航规则"
+      },
+      "attributes": {
+        "categoryOfAuthority": "maritime"
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "text": {
+                "eng": "…",
+                "zho": "…"
+              }
+            }
+          ]
+        }
+      ],
+      "associations": [
+        {
+          "role": "isApplicableTo",
+          "target": "applic-fishing",
+          "inclusion": "included",
+          "source": "第十九条"
+        }
+      ]
+    }
+  ]
+}
