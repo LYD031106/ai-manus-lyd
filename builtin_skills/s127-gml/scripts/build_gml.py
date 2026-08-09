@@ -173,11 +173,13 @@ def render_value(name: str, value, depth: int, owner_type: str | None = None) ->
     if value is None or value == "" or value == [] or value == {}:
         return lines
 
-    # 显式空值：可写成 <x xsi:nil="true"/>，
-    # 表示「该属性适用但取值未知」，与「不填」语义不同（语料里有 2 处）。
-    # 要素清单里用 {"$nil": true} 表达。
+    # 显式空值：DCEG 2.4「必填属性取值未知时，必须写成空（null）值」——
+    # 与「不填」语义不同（不填只允许用于非必填属性）。
+    # 要素清单里用 {"$nil": true} 表达；枚举属性沿用生产惯例补 code="unknown"
+    # （13 个入库数据集里 5 处如此，XSD 未声明 code 属性，见 06 文档说明）。
     if isinstance(value, dict) and value.get("$nil") is True:
-        lines.append(f'{pad}<{name} xsi:nil="true"/>')
+        code = ' code="unknown"' if name in ENUMS else ""
+        lines.append(f'{pad}<{name}{code} xsi:nil="true"/>')
         return lines
 
     # 双语合并（指南 4.1）：{"eng":…,"zho":…} 一律合并成一格；
