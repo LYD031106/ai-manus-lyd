@@ -287,9 +287,20 @@ def parse_pdf(path: Path, image_dir: Path | None) -> str:
 
     if scanned:
         lines.append(f"> ⚠️ 本 PDF 共 {n_pages} 页，**没有文本层**（平均每页仅可抽取 "
-                     f"{total_chars // max(n_pages, 1)} 字符），是扫描件。")
-        lines.append("> 本脚本不做 OCR —— 请把**整份 PDF** 直接交给 parse_regulation 工具解析。")
-        print(f"[扫描件] {path.name}：{n_pages} 页无文本层，需交 parse_regulation",
+                     f"{total_chars // max(n_pages, 1)} 字符），是扫描件，本脚本不做 OCR。")
+        if image_dir is None:
+            lines.append("> 未导出页面图（本次未指定 --image-dir）。"
+                         "请加 --image-dir 重跑，再把导出的 PNG 交给 parse_regulation 工具。")
+            print(f"[扫描件] {path.name}：{n_pages} 页无文本层，未导出（缺 --image-dir）",
+                  file=sys.stderr)
+            return "\n".join(lines)
+        # 扫描件整份渲染成 PNG —— parse_regulation 只收图片，
+        # 这样也绕开了各家 API 对 PDF 输入的不同要求（阿里需 file 通道/业务空间地址）
+        rendered = _render_pages(path, list(range(1, n_pages + 1)), path.stem, image_dir)
+        lines.append(f"> 已把全部 {len(rendered)} 页渲染成 PNG，"
+                     f"请用 parse_regulation 工具逐页解析：")
+        lines.extend(f"> - {p}" for p in rendered)
+        print(f"[扫描件] {path.name}：{n_pages} 页无文本层，已整份渲染 {len(rendered)} 页",
               file=sys.stderr)
         return "\n".join(lines)
 

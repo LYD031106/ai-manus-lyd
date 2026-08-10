@@ -138,11 +138,11 @@ class Settings(BaseSettings):
     # e.g. "redis://:password@redis:6379/0" or "amqp://user:pass@rabbitmq:5672//"
     celery_broker_url: str | None = None
 
-    # 法规解析工具配置（parse_regulation，用多模态 API 解析 PDF/图片）
-    # 未设置时回退到上面的 api_key / api_base
-    parse_api_key: str | None = None
-    parse_api_base: str | None = None
-    parse_model: str = "claude-sonnet-5"
+    # 法规图件解析工具配置（parse_regulation）
+    # 走阿里云百炼的 OpenAI 兼容接口，只用图片通道（base64 直传，无需 OSS）
+    parse_api_key: str | None = None       # 百炼 API Key；未设置时回退到 api_key
+    parse_api_base: str | None = None      # 默认 dashscope compatible-mode 端点
+    parse_model: str = "qwen-vl-max"
     parse_max_tokens: int = 16000
 
     # MCP configuration

@@ -55,7 +55,7 @@ python3 $S/parse_office.py /home/ubuntu/upload/*.pdf /home/ubuntu/upload/*.docx 
 |---|---|---|
 | PDF 有文本层、无大图 | 抽文本 + 表格 | **不要** |
 | PDF 有文本层、有大图 | 抽文本 + 表格，含图的页渲染成 PNG | 要，**只读导出的 PNG** |
-| PDF 无文本层（扫描件） | 只报告，不硬抽 | 要，**整份 PDF 交给它** |
+| PDF 无文本层（扫描件） | 整份逐页渲染成 PNG | 要，**只读导出的 PNG** |
 | Word 有内容图 | 抽正文 + 表格，导出大图 | 要，只读导出的图 |
 | Word 只有装饰图 / Excel / CSV | 全部抽完 | **不要** |
 
@@ -64,10 +64,10 @@ parse_regulation 解析」或「全为装饰图，无需调用」。图片按 �
 公文里的印章碎片、页面图标不会送模型（珠江口那份就有 802 张小图）。
 
 ```
-# 只传上一步导出的图件，以及扫描件整份 PDF —— 不要把有文本层的 PDF 传进来
+# 只传上一步导出的 PNG —— 本工具只收图片，PDF/Word 传进去会被拒
 parse_regulation(files=["/home/ubuntu/图件/成山角定线制_p8.png",
                         "/home/ubuntu/图件/附件2示意图_img1.png",
-                        "/home/ubuntu/upload/扫描通告.pdf"],
+                        "/home/ubuntu/图件/扫描通告_p1.png"],
                  output="/home/ubuntu/解析-图件.md")
 
 # 只提坐标（跳过全文解析）
@@ -76,7 +76,7 @@ parse_regulation(files=["/home/ubuntu/图件/坐标附件_p1.png"], coords_only=
 ```
 
 `parse_regulation` 参数：
-- `files`（string[]，必填）：绝对路径，**只接受** .pdf/.png/.jpg/.gif/.webp
+- `files`（string[]，必填）：绝对路径，**只接受图片** .png/.jpg/.gif/.webp/.bmp
 - `output`（string，必填）：输出文件路径，绝对路径
 - `coords_only`（bool，可选）：仅提取坐标，输出 JSON
 - `model`（string，可选）：覆盖默认模型
@@ -126,18 +126,20 @@ python3 $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
 示意图图片等。按上面 §① 的两条路分别解析：
 
 ```bash
-# 第一步：Office 文档本地解析，顺带导出 Word 里的示意图
+# 第一步：所有文件一起丢给本地脚本，它抽文本并把该看的图渲染出来
 python3 /opt/skills/s127-gml/scripts/parse_office.py \
-        /home/ubuntu/upload/附件1.docx /home/ubuntu/upload/坐标.csv \
-        -o /home/ubuntu/解析-office.md
+        /home/ubuntu/upload/通告.pdf /home/ubuntu/upload/附件1.docx \
+        /home/ubuntu/upload/坐标.csv \
+        -o /home/ubuntu/解析-local.md --image-dir /home/ubuntu/图件
 ```
 
-读一遍 `解析-office.md`，若里面列出了导出的图片路径，把它们和 PDF 一起交给
-`parse_regulation`（第二步）。
+读一遍 `解析-local.md`，按里面的 `>` 提示行决定第二步 —— 若列出了导出的 PNG 路径，
+把**那些 PNG**（不是原文件）交给 `parse_regulation`。
 
+- PDF 有文本层：本地抽文本与表格；只有含大图的页会被渲染出来
+- PDF 无文本层（扫描件）：整份逐页渲染成 PNG，文本全靠模型读
 - Word (.docx)：本地提文本与表格；**跨列合并的表会带告警**，涉及坐标务必对照原文核对
 - CSV / Excel：本地解析为 Markdown 表格
-- PDF / 图片 / Word 导出的示意图：`parse_regulation`（OCR、图中坐标、表格识别）
 - .doc / .wps：不支持，先用 shell 转成 .docx 再解析
 
 然后阅读解析结果 Markdown，确定：覆盖的地理范围、发文机构层级、属于哪个专题。
