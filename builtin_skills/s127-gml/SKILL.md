@@ -19,9 +19,9 @@ description: >-
 |---|---|---|---|
 | **schema** | `schemas/S127FC.xml`（IHO，v1.0.1-20190628） | 允许什么：要素类、子元素顺序、必填/可选、多重性、枚举、几何类型 | `scripts/s127_catalogue.py`（自动生成，勿手改） |
 | **约定** | 《S-127数据生产与发布操作指南（修订版）》 | 约定怎么填：双语、命名、来源、不表达清单 | `scripts/s127_model.py` + `references/` |
-| **实证** | 13 个已通过二审并入库的真实数据集 | 生产上实际怎么做：枚举 code 的数值、CARIS 版式 | 已并入上面两层，可用 `--verify-corpus` 复核 |
+| **实证** | 13 个已通过二审并入库的真实数据集 | 生产上实际怎么做：枚举 code 的数值、CARIS 版式 | 已并入上面两层，可用 `--verify` 复核 |
 
-XSD 换版后重跑 `python scripts/gen_s127_catalogue.py` 即可，不要手改生成物。
+要素目录换版后重跑 `python3 /opt/skills/s127-gml/scripts/gen_s127_catalogue.py` 即可，不要手改生成物。
 
 ## 核心原则：不要手写 GML
 
@@ -30,60 +30,91 @@ GML 的命名空间、几何图元链、`gml:id` 串联、`boundedBy`、`xlink:a
 
 ```
 多个 PDF/Word → ①解析为 MD → ②基于 MD 生成要素清单 JSON → ③校验 → ④构建 GML → ⑤记录表 → ⑥系统导入与补录
- （用户上传）    （parse_regulation）  （你的产出）            （脚本）   （脚本）    （脚本）    （人工）
+ （用户上传）  （parse_office+parse_regulation）（你的产出）      （脚本）   （脚本）    （脚本）    （人工）
 ```
 
 绝不直接生成 `.gml` 文本。只生成 `featureset.json`，然后用脚本完成后续步骤。
 
-### ① 解析：调用 sandbox 工具
+### ① 解析：文本走脚本，图走模型
 
-`parse_regulation` 是 sandbox 内置工具（处理 PDF/图片需要多模态 API），通过 tool call 调用：
+**核心原则：有文本层的文件，文本一律本地抽取。** 文本层是无损的，过一遍 OCR 只会变差
+（实测模型会把原文 `宽32.3米、、满载吃水` 顺手改写成 `宽32.3m`，法规数据不能这样）。
+**只有图里的信息才交给模型。**
+
+先无脑跑一遍 `parse_office.py`，它自己判断类型并在输出里告诉你还需不需要调工具：
+
+```bash
+S=/opt/skills/s127-gml/scripts
+
+python3 $S/parse_office.py /home/ubuntu/upload/*.pdf /home/ubuntu/upload/*.docx \
+        /home/ubuntu/upload/坐标.csv \
+        -o /home/ubuntu/解析-local.md --image-dir /home/ubuntu/图件
+```
+
+| 情况 | 脚本做什么 | 还要不要 parse_regulation |
+|---|---|---|
+| PDF 有文本层、无大图 | 抽文本 + 表格 | **不要** |
+| PDF 有文本层、有大图 | 抽文本 + 表格，含图的页渲染成 PNG | 要，**只读导出的 PNG** |
+| PDF 无文本层（扫描件） | 整份逐页渲染成 PNG | 要，**只读导出的 PNG** |
+| Word 有内容图 | 抽正文 + 表格，导出大图 | 要，只读导出的图 |
+| Word 只有装饰图 / Excel / CSV | 全部抽完 | **不要** |
+
+读 `解析-local.md` 里的 `>` 提示行 —— 脚本会明确写出「已导出以下图片，请用
+parse_regulation 解析」或「全为装饰图，无需调用」。图片按 ≥150×150 过滤，
+公文里的印章碎片、页面图标不会送模型（珠江口那份就有 802 张小图）。
 
 ```
-parse_regulation(files=["通告.pdf", "附件1.docx", "附件2.pdf", "坐标.csv"], output="解析结果.md")
+# 只传上一步导出的 PNG —— 本工具只收图片，PDF/Word 传进去会被拒
+parse_regulation(files=["/home/ubuntu/图件/成山角定线制_p8.png",
+                        "/home/ubuntu/图件/附件2示意图_img1.png",
+                        "/home/ubuntu/图件/扫描通告_p1.png"],
+                 output="/home/ubuntu/解析-图件.md")
 
 # 只提坐标（跳过全文解析）
-parse_regulation(files=["坐标附件.pdf"], coords_only=true, output="coords.json")
+parse_regulation(files=["/home/ubuntu/图件/坐标附件_p1.png"], coords_only=true,
+                 output="/home/ubuntu/coords.json")
 ```
 
-参数说明：
-- `files`（string[]，必填）：文件路径列表，支持 .pdf/.docx/.doc/.wps/.png/.jpg/.csv/.xlsx
-- `output`（string，必填）：输出文件路径
+`parse_regulation` 参数：
+- `files`（string[]，必填）：绝对路径，**只接受图片** .png/.jpg/.gif/.webp/.bmp
+- `output`（string，必填）：输出文件路径，绝对路径
 - `coords_only`（bool，可选）：仅提取坐标，输出 JSON
 - `model`（string，可选）：覆盖默认模型
+
+两条路的产出都要读，合起来才是完整素材。`.doc` / `.wps` 两边都不支持，先转 `.docx`。
 
 ### ②~⑤ 后续步骤：调用本地脚本
 
 ```bash
-S=.cursor/skills/s127-gml/scripts
+S=/opt/skills/s127-gml/scripts
 
 # ② 你阅读 解析结果.md，生成 featureset.json
 
 # ③ 校验，改到 0 ERROR
-python $S/validate_featureset.py featureset.json
+python3 $S/validate_featureset.py featureset.json
 
 # ④ 构建 GML
-python $S/build_gml.py featureset.json \
+python3 $S/build_gml.py featureset.json \
        -o 127CN00XXX001.gml --assoc-csv 关联补录清单.csv
 
 # ⑤ 出记录表
-python $S/make_record_table.py featureset.json \
+python3 $S/make_record_table.py featureset.json \
        -o S-127要素生产与检查记录表.xlsx
 ```
 
 辅助脚本：
 
 ```bash
-python $S/gml_to_featureset.py 已归档.gml -o featureset.json   # GML 反解（存档同步）
-python $S/roundtrip_check.py '示例/**/*.gml'                    # 保真度回归自检
+python3 $S/gml_to_featureset.py 已归档.gml -o featureset.json   # GML 反解（存档同步）
+python3 $S/roundtrip_check.py '示例/**/*.gml'                    # 保真度回归自检
 ```
 
 坐标不要手抄，用脚本从原文或附件里提：
 
 ```bash
-python $S/coords.py --text 通告正文.txt --close        # 从正文抓度分秒
-python $S/coords.py --csv area.csv --group-col name --close   # 从坐标附件抓，按区域分组
-python $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
+python3 $S/coords.py --text 通告正文.txt --close        # 从正文抓度分秒
+python3 $S/coords.py --csv area.csv --group-col name --close   # 从坐标附件抓，按区域分组
+python3 $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
 ```
 
 > 输出的坐标一律是 `[纬度, 经度]`，与 S-127 GML 的 `posList` 轴序一致。**不要调换**。
@@ -91,17 +122,25 @@ python $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
 ## 七步工作流
 
 ### ① 解析源文件与识别专题
-用户上传的通常是**多个文件**：通告正文 PDF、附件 Word（.docx/.wps）、坐标表 CSV/Excel、
-示意图图片等。调用 `parse_regulation` 工具统一解析为 Markdown：
+用户上传的通常是**多个文件**：通告正文 PDF、附件 Word（.docx）、坐标表 CSV/Excel、
+示意图图片等。按上面 §① 的两条路分别解析：
 
-```
-parse_regulation(files=["通告.pdf", "附件1.docx", "附件2.pdf", "坐标.csv"], output="解析结果.md")
+```bash
+# 第一步：所有文件一起丢给本地脚本，它抽文本并把该看的图渲染出来
+python3 /opt/skills/s127-gml/scripts/parse_office.py \
+        /home/ubuntu/upload/通告.pdf /home/ubuntu/upload/附件1.docx \
+        /home/ubuntu/upload/坐标.csv \
+        -o /home/ubuntu/解析-local.md --image-dir /home/ubuntu/图件
 ```
 
-- PDF / 图片：发送给多模态 API 解析（处理扫描件 OCR、图中坐标、表格）
-- Word (.docx)：本地提取文本和表格，内嵌图片发给 API
+读一遍 `解析-local.md`，按里面的 `>` 提示行决定第二步 —— 若列出了导出的 PNG 路径，
+把**那些 PNG**（不是原文件）交给 `parse_regulation`。
+
+- PDF 有文本层：本地抽文本与表格；只有含大图的页会被渲染出来
+- PDF 无文本层（扫描件）：整份逐页渲染成 PNG，文本全靠模型读
+- Word (.docx)：本地提文本与表格；**跨列合并的表会带告警**，涉及坐标务必对照原文核对
 - CSV / Excel：本地解析为 Markdown 表格
-- .doc / .wps：尝试 LibreOffice 转换，失败则作为 PDF 发给 API
+- .doc / .wps：不支持，先用 shell 转成 .docx 再解析
 
 然后阅读解析结果 Markdown，确定：覆盖的地理范围、发文机构层级、属于哪个专题。
 专题决定要素配方 —— 见 `references/05-专题配方.md`，里面按七类专题给出了

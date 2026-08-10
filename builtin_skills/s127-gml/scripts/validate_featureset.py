@@ -171,7 +171,8 @@ def check_against_catalogue(where: str, ftype: str, present: dict) -> None:
     for name in required_attributes(ftype):
         if present.get(name, 0) < 1:
             warn(where, f"要素目录把 {ftype}/{name} 标为必填（lower>=1），当前缺失；"
-                        f"原文确实没有对应内容时可不填，但要在记录表里说明")
+                        f"原文确实没有对应内容时，按 DCEG 2.4 应写成 "
+                        f'"{name}": {{"$nil": true}}（显式空值），而不是整个省略')
 
 
 def check_enums(where: str, node, owner: str | None = None, ftype: str | None = None) -> None:
@@ -562,6 +563,15 @@ def validate(doc: dict) -> None:
                 if kind and not geometry_allowed(ftype, kind):
                     err(where, f"要素目录规定 {ftype} 只允许 {allowed_primitives(ftype)} 几何，"
                                f"现给的是 {kind}")
+                # DCEG 5.16：报告点/线的方向语义，两种几何要求相反
+                if ftype == "RadioCallingInPoint":
+                    has_ori = bool(attrs.get("orientationValue"))
+                    if kind == "point" and not has_ori:
+                        warn(where, "DCEG 5.16：point 型报告点必须至少填一个 orientationValue；"
+                                    "反向也适用时用 trafficFlow=two-way 表达，不要加反向的 orientationValue")
+                    elif kind == "curve":
+                        warn(where, "DCEG 5.16：curve 型报告线的数字化方向必须使「须报告的交通流方向在线的右侧」"
+                                    "—— 坐标顺序写反语义即相反且无法自动检出，请对照海图确认")
             # 指南 5.3 要求地理要素关联唯一 Authority，但 S127.xsd 里
             # 只有部分要素类有 controlAuthority；其余只能间接获得主管机构。
             if ftype in CAN_HOST_CONTROL_AUTHORITY and roles.count("controlAuthority") == 0:
