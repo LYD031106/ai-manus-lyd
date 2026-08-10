@@ -35,30 +35,43 @@ GML 的命名空间、几何图元链、`gml:id` 串联、`boundedBy`、`xlink:a
 
 绝不直接生成 `.gml` 文本。只生成 `featureset.json`，然后用脚本完成后续步骤。
 
-### ① 解析：按文件类型分两条路
+### ① 解析：文本走脚本，图走模型
 
-| 文件类型 | 怎么处理 | 为什么 |
-|---|---|---|
-| Word / Excel / CSV | 沙箱内跑 `parse_office.py` | 确定性文本提取，快且不花 token |
-| PDF / 图片 | `parse_regulation` 工具 | 需要 OCR、表格识别、读图上的标注 |
-| Word 里的内嵌图片 | `parse_office.py` 导出 → 再交 `parse_regulation` | 示意图上的坐标只有模型读得出来 |
+**核心原则：有文本层的文件，文本一律本地抽取。** 文本层是无损的，过一遍 OCR 只会变差
+（实测模型会把原文 `宽32.3米、、满载吃水` 顺手改写成 `宽32.3m`，法规数据不能这样）。
+**只有图里的信息才交给模型。**
+
+先无脑跑一遍 `parse_office.py`，它自己判断类型并在输出里告诉你还需不需要调工具：
 
 ```bash
 S=/opt/skills/s127-gml/scripts
 
-# Word / Excel / CSV 本地解析；Word 内嵌图片会一并导出，输出里会列出图片路径
-python3 $S/parse_office.py /home/ubuntu/upload/附件1.docx /home/ubuntu/upload/坐标.csv \
-        -o /home/ubuntu/解析-office.md
+python3 $S/parse_office.py /home/ubuntu/upload/*.pdf /home/ubuntu/upload/*.docx \
+        /home/ubuntu/upload/坐标.csv \
+        -o /home/ubuntu/解析-local.md --image-dir /home/ubuntu/图件
 ```
 
+| 情况 | 脚本做什么 | 还要不要 parse_regulation |
+|---|---|---|
+| PDF 有文本层、无大图 | 抽文本 + 表格 | **不要** |
+| PDF 有文本层、有大图 | 抽文本 + 表格，含图的页渲染成 PNG | 要，**只读导出的 PNG** |
+| PDF 无文本层（扫描件） | 只报告，不硬抽 | 要，**整份 PDF 交给它** |
+| Word 有内容图 | 抽正文 + 表格，导出大图 | 要，只读导出的图 |
+| Word 只有装饰图 / Excel / CSV | 全部抽完 | **不要** |
+
+读 `解析-local.md` 里的 `>` 提示行 —— 脚本会明确写出「已导出以下图片，请用
+parse_regulation 解析」或「全为装饰图，无需调用」。图片按 ≥150×150 过滤，
+公文里的印章碎片、页面图标不会送模型（珠江口那份就有 802 张小图）。
+
 ```
-# PDF、图片，以及上一步导出的示意图
-parse_regulation(files=["/home/ubuntu/upload/通告.pdf",
-                        "/home/ubuntu/附件2示意图_img1.png"],
-                 output="/home/ubuntu/解析-pdf.md")
+# 只传上一步导出的图件，以及扫描件整份 PDF —— 不要把有文本层的 PDF 传进来
+parse_regulation(files=["/home/ubuntu/图件/成山角定线制_p8.png",
+                        "/home/ubuntu/图件/附件2示意图_img1.png",
+                        "/home/ubuntu/upload/扫描通告.pdf"],
+                 output="/home/ubuntu/解析-图件.md")
 
 # 只提坐标（跳过全文解析）
-parse_regulation(files=["/home/ubuntu/upload/坐标附件.pdf"], coords_only=true,
+parse_regulation(files=["/home/ubuntu/图件/坐标附件_p1.png"], coords_only=true,
                  output="/home/ubuntu/coords.json")
 ```
 

@@ -1,17 +1,33 @@
 #!/usr/bin/env python3
-"""Word / Excel / CSV → Markdown（沙箱内本地解析，不调用模型、不消耗 token）。
+"""PDF / Word / Excel / CSV → Markdown（沙箱内本地解析，文本部分不消耗 token）。
 
-    python3 $S/parse_office.py 附件1.docx 坐标.csv -o 解析结果.md
+    python3 $S/parse_office.py 通告.pdf 附件1.docx 坐标.csv -o 解析结果.md
 
 多个文件的结果按文件名分节合并。
 
-分工：能在本地确定性提取的就地做完 —— Word 正文与表格、Excel、CSV。
-需要模型看图的交给 agent 的 `parse_regulation` 工具：
+## 分工原则：文本走脚本，图走模型
 
-* PDF、图片 → 直接调 `parse_regulation`
-* **Word 里的内嵌图片** → 本脚本用 `--image-dir` 导出成图片文件，
-  再把导出的路径交给 `parse_regulation` 解析。示意图里的坐标、范围标注
-  就是这样拿到的。
+**有文本层的文件，文本一律本地抽取** —— 文本层是无损的，过一遍 OCR 只会变差
+（实测：模型会把原文 `宽32.3米、、满载吃水` 顺手改写成 `宽32.3m`，法规数据不能这样）。
+**只有图里的信息才交给模型**，用 `--image-dir` 导出后交给 agent 的
+`parse_regulation` 工具。
+
+按文件类型分三路：
+
+| 情况 | 本脚本做什么 | 还需要 parse_regulation 吗 |
+|---|---|---|
+| PDF 有文本层、无大图 | 抽文本 + 表格 | 不需要 |
+| PDF 有文本层、有大图 | 抽文本 + 表格，把**含大图的页**渲染成 PNG 导出 | 需要，只读导出的 PNG |
+| PDF 无文本层（扫描件） | 只报告页数，不抽文本 | 需要，整份文件交给它 |
+| Word 有内嵌图 | 抽正文 + 表格，导出大图 | 需要，只读导出的图 |
+| Word 无图 / Excel / CSV | 全部本地抽完 | 不需要 |
+
+图片按尺寸过滤（默认 ≥150×150）：真实公文里混着大量页面装饰、印章碎片、
+网页图标（珠江口那份就有 802 张小图），全发给模型既浪费又添噪。
+
+PDF 内嵌图的编码五花八门（JBIG2 / CCITTFax / JPX / DCT），逐个解码要引一堆依赖，
+所以 PDF 走**整页渲染**而不是抽取内嵌图 —— 渲染结果不受原图编码影响，
+且保留了图在页面里的上下文（图题、图例、周边文字）。
 """
 from __future__ import annotations
 
@@ -21,6 +37,13 @@ import io
 import sys
 from pathlib import Path
 from typing import Any, List, Tuple
+
+# 低于这个尺寸的图视为装饰，不导出（单位：PDF 用点，Word 用像素）
+MIN_IMAGE_SIDE = 150
+# 判定扫描件的阈值：平均每页可抽取字符数低于此值 → 认为没有文本层
+SCANNED_CHARS_PER_PAGE = 50
+# 整页渲染倍率，2 ≈ 144 dpi，够模型读图又不至于让 token 爆掉
+PAGE_RENDER_SCALE = 2
 
 # 多模态 API 能直接读的位图格式；EMF/WMF 等矢量格式读不了，需要另行转换
 API_READABLE = {
@@ -99,10 +122,26 @@ def docx_table_to_markdown(table) -> str:
     return markdown
 
 
-def export_images(doc, stem: str, image_dir: Path) -> Tuple[List[Path], List[Path]]:
-    """导出 Word 内嵌图片，返回 (API 可读的, 其余格式的)。"""
+def _image_side_ok(blob: bytes) -> bool:
+    """按像素尺寸判断是否值得送模型；读不出尺寸时保守地当作值得。
+
+    公文 Word 里常混着分享按钮、字号图标一类装饰图（实测有 2 KB 的），
+    发给模型纯属浪费还添噪。
+    """
+    try:
+        from PIL import Image
+        with Image.open(io.BytesIO(blob)) as im:
+            w, h = im.size
+        return w >= MIN_IMAGE_SIDE and h >= MIN_IMAGE_SIDE
+    except Exception:
+        return True
+
+
+def export_images(doc, stem: str, image_dir: Path) -> Tuple[List[Path], List[Path], int]:
+    """导出 Word 内嵌图片，返回 (API 可读的, 其余格式的, 因过小而跳过的数量)。"""
     readable: List[Path] = []
     other: List[Path] = []
+    skipped = 0
     n = 0
     for rel in doc.part.rels.values():
         if "image" not in rel.reltype:
@@ -113,12 +152,15 @@ def export_images(doc, stem: str, image_dir: Path) -> Tuple[List[Path], List[Pat
         except Exception:  # 个别损坏的图片关系不应影响整篇解析
             print("[警告] 跳过一张无法读取的内嵌图片", file=sys.stderr)
             continue
+        if not _image_side_ok(blob):
+            skipped += 1
+            continue
         n += 1
         ext = API_READABLE.get(ctype) or OTHER_IMAGE_EXT.get(ctype) or ".bin"
         target = image_dir / f"{stem}_img{n}{ext}"
         target.write_bytes(blob)
         (readable if ctype in API_READABLE else other).append(target)
-    return readable, other
+    return readable, other, skipped
 
 
 def parse_docx(path: Path, image_dir: Path | None) -> str:
@@ -157,7 +199,7 @@ def parse_docx(path: Path, image_dir: Path | None) -> str:
                 f"若图中有坐标或范围信息，请加 --image-dir 重跑并用 parse_regulation 解析图片。"
             )
         else:
-            readable, other = export_images(doc, path.stem, image_dir)
+            readable, other, skipped = export_images(doc, path.stem, image_dir)
             if readable:
                 lines.append(f"> 本文件含 {n_images} 张内嵌图片，已导出以下可解析图片，"
                              f"请用 parse_regulation 工具读取其中的坐标与范围标注：")
@@ -166,8 +208,14 @@ def parse_docx(path: Path, image_dir: Path | None) -> str:
                 lines.append(f"> ⚠️ 另有 {len(other)} 张为矢量/非位图格式，多模态 API 读不了，"
                              f"需先转成 PNG，或改用该文件的 PDF 版本：")
                 lines.extend(f"> - {p}" for p in other)
+            if skipped:
+                lines.append(f"> 另有 {skipped} 张小于 {MIN_IMAGE_SIDE}×{MIN_IMAGE_SIDE} 的"
+                             f"装饰图（图标、按钮之类），已跳过不送模型。")
+            if not readable and not other:
+                lines.append(f"> 本文件的 {n_images} 张图片全为装饰图，无需调用 parse_regulation。")
             print(f"[图片] {path.name}：导出 {len(readable)} 张可解析"
-                  + (f"、{len(other)} 张需转换" if other else ""), file=sys.stderr)
+                  + (f"、{len(other)} 张需转换" if other else "")
+                  + (f"、跳过 {skipped} 张装饰图" if skipped else ""), file=sys.stderr)
 
     return "\n".join(lines)
 
@@ -191,7 +239,91 @@ def parse_excel(path: Path, _image_dir: Path | None = None) -> str:
     return "\n\n".join(parts) if parts else "(空表格)"
 
 
+def _render_pages(path: Path, pages: List[int], stem: str, image_dir: Path) -> List[Path]:
+    """把指定页（1 基）渲染成 PNG 导出，返回文件路径。
+
+    渲染整页而非抽取内嵌图：PDF 内嵌图编码有 JBIG2 / CCITTFax / JPX 等多种，
+    逐个解码要引一堆依赖；渲染不受编码影响，还保留了图题图例等上下文。
+    """
+    import pypdfium2 as pdfium
+
+    out: List[Path] = []
+    doc = pdfium.PdfDocument(str(path))
+    try:
+        for pno in pages:
+            img = doc[pno - 1].render(scale=PAGE_RENDER_SCALE).to_pil()
+            target = image_dir / f"{stem}_p{pno}.png"
+            img.save(target, "PNG")
+            out.append(target)
+    finally:
+        doc.close()
+    return out
+
+
+def parse_pdf(path: Path, image_dir: Path | None) -> str:
+    """解析 PDF：有文本层就本地抽文本与表格，含大图的页另行渲染导出。
+
+    扫描件（没有文本层）不在这里硬抽 —— 抽出来是空的或乱的，
+    直接报告让调用方把整份文件交给 parse_regulation。
+    """
+    import pdfplumber
+
+    lines: List[str] = []
+    with pdfplumber.open(str(path)) as pdf:
+        n_pages = len(pdf.pages)
+        page_texts: List[str] = []
+        page_tables: List[List[List[List[Any]]]] = []
+        img_pages: List[int] = []
+        for i, page in enumerate(pdf.pages, start=1):
+            page_texts.append(page.extract_text() or "")
+            page_tables.append(page.extract_tables() or [])
+            if any(abs(im["x1"] - im["x0"]) >= MIN_IMAGE_SIDE
+                   and abs(im["top"] - im["bottom"]) >= MIN_IMAGE_SIDE
+                   for im in page.images):
+                img_pages.append(i)
+
+    total_chars = sum(len(t) for t in page_texts)
+    scanned = total_chars / max(n_pages, 1) < SCANNED_CHARS_PER_PAGE
+
+    if scanned:
+        lines.append(f"> ⚠️ 本 PDF 共 {n_pages} 页，**没有文本层**（平均每页仅可抽取 "
+                     f"{total_chars // max(n_pages, 1)} 字符），是扫描件。")
+        lines.append("> 本脚本不做 OCR —— 请把**整份 PDF** 直接交给 parse_regulation 工具解析。")
+        print(f"[扫描件] {path.name}：{n_pages} 页无文本层，需交 parse_regulation",
+              file=sys.stderr)
+        return "\n".join(lines)
+
+    for i, (text, tables) in enumerate(zip(page_texts, page_tables), start=1):
+        body = text.strip()
+        if not body and not tables:
+            continue
+        lines.append(f"### 第 {i} 页")
+        if body:
+            lines.append(body)
+        for t in tables:
+            lines.append("")
+            lines.append(rows_to_markdown(t))
+        lines.append("")
+
+    if img_pages:
+        if image_dir is None:
+            lines.append(f"> ⚠️ 第 {', '.join(map(str, img_pages))} 页含图件，未导出"
+                         f"（本次未指定 --image-dir）。图中若有坐标或范围信息，"
+                         f"请加 --image-dir 重跑并用 parse_regulation 解析。")
+        else:
+            rendered = _render_pages(path, img_pages, path.stem, image_dir)
+            lines.append(f"> 第 {', '.join(map(str, img_pages))} 页含图件，"
+                         f"已按页渲染导出 {len(rendered)} 张 PNG，"
+                         f"请用 parse_regulation 工具读取其中的坐标与范围标注：")
+            lines.extend(f"> - {p}" for p in rendered)
+            print(f"[图件] {path.name}：{n_pages} 页中 {len(rendered)} 页含图，已渲染导出",
+                  file=sys.stderr)
+
+    return "\n".join(lines)
+
+
 PARSERS = {
+    ".pdf": ("PDF", parse_pdf),
     ".docx": ("Word", parse_docx),
     ".csv": ("Table", parse_csv),
     ".xlsx": ("Table", parse_excel),

@@ -96,12 +96,13 @@ class ParseRegulationToolkit(BaseToolkit):
 
     name: str = "parse_regulation"
     instructions: str = """
-- 需要读取 PDF 或图片（扫描件、示意图）的内容时用本工具，不要用 shell 或文件工具读二进制
-- 只接受 .pdf / .png / .jpg / .gif / .webp；一次可传多个文件，结果合并写入 output
-- Word / Excel / CSV 不要用本工具，本地解析更快也不花 token，改用 shell 跑
-  `python3 /opt/skills/s127-gml/scripts/parse_office.py <文件...> -o <输出.md>`
-- Word 里有内嵌图片时，上面那个脚本会把图导出并在输出里列出路径，
-  再用本工具解析那些图片，才能拿到示意图上的坐标与范围标注
+- 本工具只用来读**图**：示意图、扫描件。只接受 .pdf / .png / .jpg / .gif / .webp
+- **先跑本地脚本，再决定要不要用本工具**：
+  `python3 /opt/skills/s127-gml/scripts/parse_office.py <所有文件...> -o <输出.md> --image-dir <图件目录>`
+  该脚本处理 PDF/Word/Excel/CSV 的文本，并在输出的 `>` 提示行里写明还需不需要调本工具
+- **有文本层的 PDF 不要传进来** —— 文本层是无损的，过 OCR 反而会被改写；
+  这类 PDF 只把脚本导出的图件 PNG 传给本工具
+- 只在两种情况下调本工具：① 脚本导出的图件 PNG；② 脚本判定为扫描件的整份 PDF
 - files 与 output 都用绝对路径；用户上传的附件在 /home/ubuntu/upload/ 下
 - 只需要地理坐标时加 coords_only=true，可跳过全文解析
 - 工具只负责产出 Markdown，解析完再用文件工具读 output 查看内容
@@ -143,8 +144,8 @@ class ParseRegulationToolkit(BaseToolkit):
                     success=False,
                     message=f"{PurePosixPath(path).name} 是 Office 文档，本工具不处理。请用 shell 执行："
                             f"python3 /opt/skills/s127-gml/scripts/parse_office.py "
-                            f"{path} -o <输出.md>"
-                            f"（该脚本会把 Word 内嵌图片导出，再用本工具解析导出的图片）",
+                            f"{path} -o <输出.md> --image-dir <图件目录>"
+                            f"（该脚本抽文本并导出图件，之后只把导出的图片传给本工具）",
                 )
             if suffix != ".pdf" and suffix not in _IMAGE_MIME:
                 return ToolResult(
