@@ -68,18 +68,29 @@ parse_regulation 解析」或「全为装饰图，无需调用」。图片按 �
 parse_regulation(files=["/home/ubuntu/图件/成山角定线制_p8.png",
                         "/home/ubuntu/图件/附件2示意图_img1.png",
                         "/home/ubuntu/图件/扫描通告_p1.png"],
-                 output="/home/ubuntu/解析-图件.md")
+                 output="/home/ubuntu/识别-图件.md")
 
-# 只提坐标（跳过全文解析）
+# 重点关注坐标（仍是原样转录，不做换算）
 parse_regulation(files=["/home/ubuntu/图件/坐标附件_p1.png"], coords_only=true,
-                 output="/home/ubuntu/coords.json")
+                 output="/home/ubuntu/识别-坐标.md")
 ```
 
 `parse_regulation` 参数：
 - `files`（string[]，必填）：绝对路径，**只接受图片** .png/.jpg/.gif/.webp/.bmp
 - `output`（string，必填）：输出文件路径，绝对路径
-- `coords_only`（bool，可选）：仅提取坐标，输出 JSON
+- `coords_only`（bool，可选）：提示模型重点关注经纬度，仍按原样转录
 - `model`（string，可选）：覆盖默认模型
+
+> **它做的是文字识别，不是结构化。** 返回的是图中原文（度分秒也保持原样），
+> 用的是 `qwen-vl-ocr` 而非通用视觉模型 —— 后者实测会改写原文：
+> 「采取**避让**行动时」→「采取让行动时」、「**船载**自动识别系统」→「船舶自动识别系统」。
+> 法规条文不能被改写，所以识别这一步刻意不让模型归纳。
+>
+> **分要素、判专题、把度分秒换算成十进制，都是你拿到原文之后自己做**
+> —— 那一步有原文可核，比让识别模型顺手总结安全。坐标换算用 `coords.py`，不要手算。
+>
+> 单页输出上限 4096 tokens。若输出里出现「本页输出已达上限」的提示，
+> 说明该页没识别完，把那页图裁成上下两半重新识别。
 
 两条路的产出都要读，合起来才是完整素材。`.doc` / `.wps` 两边都不支持，先转 `.docx`。
 
