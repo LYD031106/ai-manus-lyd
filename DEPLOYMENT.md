@@ -24,6 +24,14 @@ codex/lightweight-sandbox
 /opt/ai-manus
 ~~~
 
+当前服务器实际运行目录：
+
+~~~text
+/opt/ai-manus-github-20260812
+~~~
+
+后续在这台服务器执行更新、构建和 Compose 操作时，应进入上述实际目录；`/opt/ai-manus` 是文档中的通用示例目录。
+
 服务组成：
 
 ~~~text
@@ -323,4 +331,3 @@ docker image prune -f
 5. Sandbox 保持内存、CPU、PID 限制。
 6. 每次升级保留至少一个可回滚 Git 提交或镜像版本。
 7. Mongo 数据定期备份，并保留异机副本。
-
