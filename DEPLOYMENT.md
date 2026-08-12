@@ -27,7 +27,7 @@ codex/lightweight-sandbox
 当前服务器实际运行目录：
 
 ~~~text
-/opt/ai-manus-github-20260812
+/opt/ai-manus-lyd
 ~~~
 
 后续在这台服务器执行更新、构建和 Compose 操作时，应进入上述实际目录；`/opt/ai-manus` 是文档中的通用示例目录。
