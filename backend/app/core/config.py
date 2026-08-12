@@ -138,12 +138,13 @@ class Settings(BaseSettings):
     # e.g. "redis://:password@redis:6379/0" or "amqp://user:pass@rabbitmq:5672//"
     celery_broker_url: str | None = None
 
-    # 法规图件解析工具配置（parse_regulation）
+    # 法规图件文字识别配置（parse_regulation）
     # 走阿里云百炼的 OpenAI 兼容接口，只用图片通道（base64 直传，无需 OSS）
+    # 用 OCR 模型而非通用 VL：通用模型会改写原文，法规条文不能被改写
     parse_api_key: str | None = None       # 百炼 API Key；未设置时回退到 api_key
     parse_api_base: str | None = None      # 默认 dashscope compatible-mode 端点
-    parse_model: str = "qwen-vl-max"
-    parse_max_tokens: int = 16000
+    parse_model: str = "qwen-vl-ocr"
+    parse_max_tokens: int = 4096           # qwen-vl-ocr 的上限就是 4096
 
     # MCP configuration
     mcp_config_path: str = "/etc/mcp.json"
