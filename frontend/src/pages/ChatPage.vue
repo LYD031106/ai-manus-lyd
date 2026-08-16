@@ -236,7 +236,7 @@ const toolHistory = computed(() => {
 const chatPlaceholder = computed(() => t('Send message to Manus'));
 
 // Shared SSE event -> message list conversion
-const { handleEvent } = useAgentEvents(
+const { handleEvent, replayEvents } = useAgentEvents(
   { messages, title, plan, isLoading, lastEventId, lastTool, lastNoMessageTool },
   {
     onToolActivity: (tool: ToolContent) => {
@@ -390,9 +390,7 @@ const restoreSession = async () => {
     shareMode.value = session.is_shared ? 'public' : 'private';
     sessionStatus.value = session.status as SessionStatus;
     realTime.value = false;
-    for (const event of session.events) {
-      handleEvent(event);
-    }
+    replayEvents(session.events);
     realTime.value = true;
     isRestoringSession.value = false;
     await nextTick();

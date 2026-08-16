@@ -1,4 +1,4 @@
-import type { Ref } from 'vue';
+import { ref, type Ref } from 'vue';
 import {
   Message,
   MessageContent,
@@ -36,10 +36,13 @@ export interface AgentEventOptions {
  * Used by both ChatPage (live chat) and SharePage (replay).
  */
 export function useAgentEvents(state: AgentEventState, options: AgentEventOptions = {}) {
-  const { messages, title, plan, isLoading, lastEventId, lastTool, lastNoMessageTool } = state;
+  // Live SSE events update the component refs directly. History replay uses a
+  // temporary plain ref state and commits it once, so Vue only renders the
+  // final message list instead of observing every historical event.
+  let activeState = state;
 
   const getLastStep = (): StepContent | undefined => {
-    return messages.value.filter(message => message.type === 'step').pop()?.content as StepContent;
+    return activeState.messages.value.filter(message => message.type === 'step').pop()?.content as StepContent;
   };
 
   const handleMessageEvent = (messageData: MessageEventData) => {
@@ -47,7 +50,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     const text = (messageData.content ?? '').trim();
     if (messageData.role === 'assistant' && !text) {
       if (messageData.attachments && messageData.attachments.length > 0) {
-        messages.value.push({
+        activeState.messages.value.push({
           type: 'attachments',
           content: {
             ...messageData
@@ -57,7 +60,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
       return;
     }
 
-    messages.value.push({
+    activeState.messages.value.push({
       type: messageData.role,
       content: {
         ...messageData
@@ -65,7 +68,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     });
 
     if (messageData.attachments && messageData.attachments.length > 0) {
-      messages.value.push({
+      activeState.messages.value.push({
         type: 'attachments',
         content: {
           ...messageData
@@ -79,13 +82,14 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     const toolContent: ToolContent = {
       ...toolData
     };
+    const lastTool = activeState.lastTool;
     if (lastTool.value && lastTool.value.tool_call_id === toolContent.tool_call_id) {
       Object.assign(lastTool.value, toolContent);
     } else {
       if (lastStep?.status === 'running') {
         lastStep.tools.push(toolContent);
       } else {
-        messages.value.push({
+        activeState.messages.value.push({
           type: 'tool',
           content: toolContent,
         });
@@ -93,7 +97,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
       lastTool.value = toolContent;
     }
     if (toolContent.name !== 'message') {
-      lastNoMessageTool.value = toolContent;
+      activeState.lastNoMessageTool.value = toolContent;
       options.onToolActivity?.(toolContent);
     }
   };
@@ -101,7 +105,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
   const handleStepEvent = (stepData: StepEventData) => {
     const lastStep = getLastStep();
     if (stepData.status === 'running') {
-      messages.value.push({
+      activeState.messages.value.push({
         type: 'step',
         content: {
           ...stepData,
@@ -113,13 +117,13 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
         lastStep.status = stepData.status;
       }
     } else if (stepData.status === 'failed') {
-      isLoading.value = false;
+      activeState.isLoading.value = false;
     }
   };
 
   const handleErrorEvent = (errorData: ErrorEventData) => {
-    isLoading.value = false;
-    messages.value.push({
+    activeState.isLoading.value = false;
+    activeState.messages.value.push({
       type: 'assistant',
       content: {
         content: errorData.error,
@@ -129,11 +133,11 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
   };
 
   const handleTitleEvent = (titleData: TitleEventData) => {
-    title.value = titleData.title;
+    activeState.title.value = titleData.title;
   };
 
   const handlePlanEvent = (planData: PlanEventData) => {
-    plan.value = planData;
+    activeState.plan.value = planData;
   };
 
   const handleEvent = (event: AgentSSEEvent) => {
@@ -154,8 +158,37 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     } else if (event.event === 'plan') {
       handlePlanEvent(event.data as PlanEventData);
     }
-    lastEventId.value = event.data.event_id;
+    activeState.lastEventId.value = event.data.event_id;
   };
 
-  return { handleEvent };
+  const replayEvents = (events: AgentSSEEvent[]) => {
+    const replayState: AgentEventState = {
+      messages: ref<Message[]>([]),
+      title: ref(state.title.value),
+      plan: ref(state.plan.value),
+      isLoading: ref(state.isLoading.value),
+      lastEventId: ref(state.lastEventId.value),
+      lastTool: ref(state.lastTool.value),
+      lastNoMessageTool: ref(state.lastNoMessageTool.value),
+    };
+    const previousState = activeState;
+    activeState = replayState;
+    try {
+      for (const event of events) {
+        handleEvent(event);
+      }
+    } finally {
+      activeState = previousState;
+    }
+
+    state.messages.value = replayState.messages.value;
+    state.title.value = replayState.title.value;
+    state.plan.value = replayState.plan.value;
+    state.isLoading.value = replayState.isLoading.value;
+    state.lastEventId.value = replayState.lastEventId.value;
+    state.lastTool.value = replayState.lastTool.value;
+    state.lastNoMessageTool.value = replayState.lastNoMessageTool.value;
+  };
+
+  return { handleEvent, replayEvents };
 }
