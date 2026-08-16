@@ -81,6 +81,7 @@ const props = withDefaults(defineProps<{
     placeholder?: string;
 }>(), {
     placeholder: undefined,
+    allowSendFilesOnly: true,
 });
 
 const placeholderText = computed(() => props.placeholder || t('Give Manus a task to work on...'));
