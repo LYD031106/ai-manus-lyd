@@ -144,7 +144,9 @@ class AgentDomainService:
 
             task = await self._get_task(session)
 
-            if message:
+            if message or attachments:
+                if not (message or "").strip() and attachments:
+                    message = "Please process the attached files."
                 message_event = MessageEvent(
                     message=message,
                     role="user",

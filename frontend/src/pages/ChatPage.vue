@@ -307,12 +307,14 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
     cancelCurrentChat.value = null;
   }
 
-  if (message.trim()) {
+  const effectiveMessage = message.trim() || (files.length > 0 ? t('Process the attached files') : '');
+
+  if (effectiveMessage) {
     // Add user message to conversation list
     messages.value.push({
       type: 'user',
       content: {
-        content: message,
+        content: effectiveMessage,
         timestamp: Math.floor(Date.now() / 1000)
       } as MessageContent,
     });
@@ -340,7 +342,7 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
     // Use the split event handler function and store the cancel function
     cancelCurrentChat.value = await agentApi.chatWithSession(
       sessionId.value,
-      message,
+      effectiveMessage,
       lastEventId.value,
       files.map((file: FileInfo) => ({file_id : file.file_id, 
                                         filename : file.filename})),

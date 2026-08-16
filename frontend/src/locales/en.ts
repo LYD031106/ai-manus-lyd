@@ -166,6 +166,7 @@ export default {
   'Failed to load file content': 'Failed to load file content',
   'Give Manus a task to work on...': 'Give Manus a task to work on...',
   'Send message to Manus': 'Send message to Manus',
+  'Process the attached files': 'Process the attached files',
   'Add files and more': 'Add files and more',
   'Add local files': 'Add local files',
   'You can choose to take over the browser to complete the operation.': 'You can choose to take over the browser to complete the operation.',

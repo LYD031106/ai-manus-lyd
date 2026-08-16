@@ -166,6 +166,7 @@ export default {
   'Failed to load file content': '加载文件内容失败',
   'Give Manus a task to work on...': '给 Manus 一个任务...',
   'Send message to Manus': '给 Manus 发消息...',
+  'Process the attached files': '请处理上传的文件',
   'Add files and more': '添加文件等',
   'Add local files': '添加本地文件',
   'You can choose to take over the browser to complete the operation.': '你可以选择接管浏览器以完成操作。',
