@@ -23,6 +23,20 @@ SESSION_LIST_PROJECTION = {
     "task_mode": 1,
 }
 
+# The history endpoint does not need sandbox/file-library metadata.  Keeping
+# this projection separate avoids transferring the per-session ``files`` array
+# and unrelated fields before the event list is converted for the browser.
+SESSION_HISTORY_PROJECTION = {
+    "session_id": 1,
+    "user_id": 1,
+    "agent_id": 1,
+    "title": 1,
+    "status": 1,
+    "is_shared": 1,
+    "task_mode": 1,
+    "events": 1,
+}
+
 class MongoSessionRepository(SessionRepository):
     """MongoDB implementation of SessionRepository"""
     
@@ -87,6 +101,21 @@ class MongoSessionRepository(SessionRepository):
             SessionDocument.user_id == user_id
         )
         return mongo_session.to_domain() if mongo_session else None
+
+    async def find_history_by_id_and_user_id(self, session_id: str, user_id: str) -> Optional[Session]:
+        """Load only the event payload needed to restore a chat page."""
+        collection = SessionDocument.get_pymongo_collection()
+        document = await collection.find_one(
+            {"session_id": session_id, "user_id": user_id},
+            SESSION_HISTORY_PROJECTION,
+        )
+        if not document:
+            return None
+
+        # Beanie's document model supplies defaults for fields omitted by the
+        # projection (files, timestamps, counters, etc.).
+        mongo_session = SessionDocument.model_validate(document)
+        return mongo_session.to_domain()
     
     async def update_title(self, session_id: str, title: str) -> None:
         """Update the title of a session"""

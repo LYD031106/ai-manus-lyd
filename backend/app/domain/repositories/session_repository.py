@@ -26,6 +26,10 @@ class SessionRepository(Protocol):
     async def find_by_id_and_user_id(self, session_id: str, user_id: str) -> Optional[Session]:
         """Find a session by ID and user ID (for authorization)"""
         ...
+
+    async def find_history_by_id_and_user_id(self, session_id: str, user_id: str) -> Optional[Session]:
+        """Find only the fields required to render a session history."""
+        ...
     
     async def update_title(self, session_id: str, title: str) -> None:
         """Update the title of a session"""

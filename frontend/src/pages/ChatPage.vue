@@ -217,6 +217,8 @@ const chatContainerRef = ref<HTMLDivElement>();
 const moreBtnRef = ref<HTMLElement | null>(null);
 const sessionStatus = ref<SessionStatus | undefined>(undefined);
 const { showContextMenu } = useContextMenu();
+const isRestoringSession = ref(false);
+let restoreGeneration = 0;
 
 const toolHistory = computed(() => {
   const tools: ToolContent[] = [];
@@ -247,6 +249,11 @@ const { handleEvent } = useAgentEvents(
 
 // Reset all refs to their initial values
 const resetState = () => {
+  // Invalidate an in-flight history request so a slow response from the
+  // previous route cannot append events to the newly selected session.
+  restoreGeneration += 1;
+  isRestoringSession.value = false;
+
   // Cancel any existing chat connection
   if (cancelCurrentChat.value) {
     cancelCurrentChat.value();
@@ -258,6 +265,9 @@ const resetState = () => {
 
 // Watch message changes and automatically scroll to bottom
 watch(messages, async () => {
+  // Restore history in one batch. Scrolling once after the batch avoids a
+  // nextTick/layout cycle for every historical event.
+  if (isRestoringSession.value) return;
   await nextTick();
   if (follow.value) {
     simpleBarRef.value?.scrollToBottom();
@@ -368,19 +378,44 @@ const restoreSession = async () => {
     showErrorToast(t('Session not found'));
     return;
   }
-  const session = await agentApi.getSession(sessionId.value);
-  // Initialize share mode based on session state
-  shareMode.value = session.is_shared ? 'public' : 'private';
-  sessionStatus.value = session.status as SessionStatus;
-  realTime.value = false;
-  for (const event of session.events) {
-    handleEvent(event);
+  const currentGeneration = ++restoreGeneration;
+  isRestoringSession.value = true;
+  isLoading.value = true;
+
+  try {
+    const session = await agentApi.getSession(sessionId.value);
+    if (currentGeneration !== restoreGeneration) return;
+
+    // Initialize share mode based on session state
+    shareMode.value = session.is_shared ? 'public' : 'private';
+    sessionStatus.value = session.status as SessionStatus;
+    realTime.value = false;
+    for (const event of session.events) {
+      handleEvent(event);
+    }
+    realTime.value = true;
+    isRestoringSession.value = false;
+    await nextTick();
+    if (follow.value) {
+      simpleBarRef.value?.scrollToBottom();
+    }
+
+    if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
+      await chat();
+    } else {
+      isLoading.value = false;
+    }
+    agentApi.clearUnreadMessageCount(sessionId.value);
+  } catch (error) {
+    if (currentGeneration === restoreGeneration) {
+      isRestoringSession.value = false;
+      reportChatError(error);
+    }
+  } finally {
+    if (currentGeneration === restoreGeneration) {
+      isRestoringSession.value = false;
+    }
   }
-  realTime.value = true;
-  if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
-    await chat();
-  }
-  agentApi.clearUnreadMessageCount(sessionId.value);
 }
 
 

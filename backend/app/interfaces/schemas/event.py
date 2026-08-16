@@ -66,13 +66,23 @@ class MessageSSEEvent(BaseSSEEvent):
     data: MessageEventData
 
     @classmethod
-    async def from_event_async(cls, event: MessageEvent) -> Self:
+    async def from_event_async(
+        cls,
+        event: MessageEvent,
+        include_file_urls: bool = True,
+    ) -> Self:
         return cls(
             data=MessageEventData(
                 **BaseEventData.base_event_data(event),
                 role=event.role,
                 content=event.message,
-                attachments=[await FileInfoResponse.from_domain(attachment) for attachment in event.attachments] if event.attachments else None
+                attachments=[
+                    await FileInfoResponse.from_domain(
+                        attachment,
+                        include_file_url=include_file_urls,
+                    )
+                    for attachment in event.attachments
+                ] if event.attachments else None
             )
         )
 
@@ -200,17 +210,30 @@ class EventMapper:
     """Map AgentEvent (domain) to SSEEvent (wire format)"""
 
     @staticmethod
-    async def event_to_sse_event(event: AgentEvent) -> AgentSSEEvent:
+    async def event_to_sse_event(
+        event: AgentEvent,
+        include_file_urls: bool = True,
+    ) -> AgentSSEEvent:
         sse_event_class = _EVENT_TYPE_TO_SSE_CLASS.get(event.type, CommonSSEEvent)
         # Classes needing IO (e.g. signed URLs) define from_event_async
         from_event_async = getattr(sse_event_class, "from_event_async", None)
         if from_event_async is not None:
+            if sse_event_class is MessageSSEEvent:
+                return await from_event_async(event, include_file_urls=include_file_urls)
             return await from_event_async(event)
         return sse_event_class.from_event(event)
 
     @staticmethod
-    async def events_to_sse_events(events: List[AgentEvent]) -> List[AgentSSEEvent]:
+    async def events_to_sse_events(
+        events: List[AgentEvent],
+        include_file_urls: bool = True,
+    ) -> List[AgentSSEEvent]:
         """Create SSE event list from event list"""
         return [
-            await EventMapper.event_to_sse_event(event) for event in events if event
+            await EventMapper.event_to_sse_event(
+                event,
+                include_file_urls=include_file_urls,
+            )
+            for event in events
+            if event
         ]

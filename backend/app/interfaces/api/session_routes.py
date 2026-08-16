@@ -51,14 +51,16 @@ async def get_session(
     current_user: User = Depends(get_current_user),
     agent_service: AgentService = Depends(get_agent_service)
 ) -> APIResponse[GetSessionResponse]:
-    session = await agent_service.get_session(session_id, current_user.id)
+    session = await agent_service.get_session_history(session_id, current_user.id)
     if not session:
         raise NotFoundError("Session not found")
     return APIResponse.success(GetSessionResponse(
         session_id=session.id,
         title=session.title,
         status=session.status,
-        events=await EventMapper.events_to_sse_events(session.events),
+        # File URLs are resolved lazily by the file preview endpoint. Avoid a
+        # GridFS lookup for every attachment while restoring a history page.
+        events=await EventMapper.events_to_sse_events(session.events, include_file_urls=False),
         is_shared=session.is_shared,
         task_mode=session.task_mode,
     ))
