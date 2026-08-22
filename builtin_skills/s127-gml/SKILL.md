@@ -186,8 +186,9 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 ### ③ 逐条转换为要素
 对每一条条文问三个问题，顺序不能颠倒：
 
-1. **要不要表达？** 常识性内容、海上作业申报、入港申请、指挥中心临时管制条件
-   一律不转换 —— 完整清单见 `references/07-审核检查清单.md` §不表达清单。
+1. **要不要表达？** 常识性内容、海上作业申报、入港申请、指挥中心临时管制条件、
+   桥区水域范围调整 / 代表船型变化等**范围元数据**一律不转换 —— 完整清单见
+   `references/07-审核检查清单.md` §不表达清单。
 2. **ENC 是否已表达？** 已表达的等同内容不转换为 S-127（指南 3.2(2)）。
    坐标与 ENC 一致的报告线/引航登离轮点，直接从 ENC 导入而不是重画。
 3. **该建地理要素还是信息要素？**
@@ -202,7 +203,7 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 | 「禁止会遇」 | `WaterwayArea`（**不是**限制区） |
 | 单向/双向通航等交通管制 | `RestrictedAreaNavigational` |
 | 商渔船碰撞高风险警示区 | `ConcentrationOfShippingHazardArea` |
-| 桥区水域 + 净空高 | 桥区范围建要素，净空信息填 `textContent` |
+| 桥区水域 + 禁锚/限速等规定 | 建 `RestrictedAreaNavigational` 并用 `restriction` 枚举；净空高 / 禁止会遇等无枚举需求才用 `WaterwayArea`（净空信息填 `textContent`） |
 | 富余水深，不同条件 | 每个条件各建一个 `UCAA`，即使几何完全相同 |
 | 船舶避险推荐水域 | `PlaceOfRefuge` |
 
@@ -211,9 +212,31 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 - 单值文本属性写成 `["English text", "中文文本"]`，脚本会用 CR 连成一格
 - `featureName` 写成 `{"eng": "...", "zho": "..."}`，脚本按规则补 `displayName`
 - 枚举属性写 label（如 `"speed restricted"`），脚本从 XSD 查表补 `code`
+- **承载原则（甲方确认）**：能用结构化属性（枚举 / 专用字段）承载的内容一律落结构化属性，
+  不落自由文本；描述地理范围的文字一律不作文本属性（见 `references/01-通用编码规则.md` §5）；
+  规则类条文优先映射成 `restriction` 枚举，只有无法枚举的合规内容才进 `textContent`
 - 命名尽量精简，体现所属区域/系统与功能；英文词首大写，数值加千分位
 - **只填原文有的**：XSD 必填项见 `references/02-要素字典.md` §二那张表，
   其余属性一律「有则填、无则不填」，不要为了"填满"而编造内容
+
+禁止/限制类条文的常见 `restriction` 枚举映射（完整 39 值与 code 见 `references/03-枚举代码表.md`）：
+
+| 原文 | `restriction` |
+|---|---|
+| 不得/禁止锚泊 | `anchoring prohibited` |
+| 禁止捕捞 / 捕捞作业 | `fishing prohibited` |
+| 禁止追越 | `overtaking prohibited` |
+| 禁止掉头 | `turning prohibited` |
+| 限速 / 最高航速 | `speed restricted` |
+
+> **「除…外」例外不改枚举值（甲方口径）**：凡「不得/禁止锚泊」一律 → `anchoring prohibited`，
+> 即使原文带「除紧急情况或航道疏浚、维护外」这类例外；例外情形（紧急锚泊须报告并驶离等）
+> 用 ShipReport / `textContent` 另行表达，**不要**因为条文有「除…外」就把 `restriction`
+> 降级成 `anchoring restricted`——S-127 的 `anchoring restricted` 只用于「指定条件下**允许**锚泊」
+> （如仅限指定锚位、须经许可）的场景。
+
+> `anchoring prohibited` 只在 `RestrictedAreaNavigational` 等部分要素类的 `restriction`
+> 允许子集内；`RestrictedAreaRegulatory` **没有**这个取值（各要素类子集见 `references/08`）。
 
 英译没有官方版本时：先搜权威机构的英文发文引用，再用工具翻译并逐句核对海事专业术语。
 

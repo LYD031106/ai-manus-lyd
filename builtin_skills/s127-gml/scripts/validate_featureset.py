@@ -75,6 +75,8 @@ NOT_EXPRESSED = [
     (r"(进出港|入港|航行).{0,8}申报|报港手续", "指南 6.2(3)：申报类条文行为主体非船舶，不作表达"),
     (r"(视程|能见度).{0,12}(小于|低于).{0,20}(实施|禁止).{0,10}(单向通航|进出港)",
      "指南 6.2(4)：由指挥中心/VTS 研判下达的临时交通管制措施不作表达"),
+    (r"代表船型|桥区水域范围.{0,10}(调整|变化)",
+     "「代表船型」/桥区水域范围调整等范围元数据不属于 S-127 表达范围"),
 ]
 
 errors: list[str] = []
@@ -606,6 +608,19 @@ def validate(doc: dict) -> None:
         if ftype in ("RestrictedAreaNavigational", "RestrictedAreaRegulatory") \
                 and not attrs.get("restriction"):
             warn(where, "限制区/监管区通常需要 restriction；否则考虑改用 WaterwayArea 或信息要素（指南 5.11、5.14）")
+        # 「不得/禁止锚泊」应落成 restriction 枚举，而非只写进 textContent
+        if ftype in ("RestrictedAreaNavigational", "RestrictedAreaRegulatory", "WaterwayArea"):
+            restrictions = attrs.get("restriction")
+            rest_labels = restrictions if isinstance(restrictions, list) else [restrictions]
+            rest_labels = [str(x) for x in rest_labels if x]
+            if not any("anchoring" in x for x in rest_labels):
+                for _path, text in iter_texts(
+                    {"textContent": feat.get("textContent"), "attributes": feat.get("attributes")}
+                ):
+                    if "锚泊" in text:
+                        warn(where, "textContent 含「锚泊」但未用 restriction = anchoring prohibited；"
+                                    "「不得/禁止锚泊」应落到 RestrictedAreaNavigational 的 restriction 枚举")
+                        break
         if ftype == "RouteingMeasure" and attrs.get("categoryOfRouteingMeasure") == "recommended route":
             if not any(ROLE_TITLE.get(a.get("role")) == "PermissionType" for a in assocs):
                 warn(where, "推荐航路应关联渔船 APPLIC（沿海公共航路 not recommended／"
