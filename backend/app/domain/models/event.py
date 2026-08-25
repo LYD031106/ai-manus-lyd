@@ -7,7 +7,6 @@ from enum import Enum
 from app.domain.models.plan import Plan, Step
 from app.domain.models.file import FileInfo
 import json
-from app.domain.models.search import SearchResultItem
 
 
 class PlanStatus(str, Enum):
@@ -52,10 +51,6 @@ class BrowserToolContent(BaseModel):
     """Browser tool content"""
     screenshot: str
 
-class SearchToolContent(BaseModel):
-    """Search tool content"""
-    results: List[SearchResultItem]
-
 class ShellToolContent(BaseModel):
     """Shell tool content"""
     console: Any
@@ -71,7 +66,6 @@ class McpToolContent(BaseModel):
 
 ToolContent = Union[
     BrowserToolContent,
-    SearchToolContent,
     ShellToolContent,
     FileToolContent,
     McpToolContent

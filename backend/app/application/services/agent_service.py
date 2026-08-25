@@ -14,7 +14,6 @@ from app.domain.models.event import AgentEvent
 from typing import Type
 from app.domain.models.agent import Agent
 from app.domain.external.sandbox import Sandbox
-from app.domain.external.search import SearchEngine
 from app.domain.external.file import FileStorage
 from app.domain.external.llm import LLM
 from app.domain.repositories.agent_repository import AgentRepository
@@ -37,7 +36,6 @@ class AgentService:
         file_storage: FileStorage,
         mcp_repository: MCPRepository,
         llm: LLM,
-        search_engine: Optional[SearchEngine] = None,
         file_favorite_repository: Optional[FileFavoriteRepository] = None,
     ):
         logger.info("Initializing AgentService")
@@ -53,9 +51,7 @@ class AgentService:
             file_storage,
             mcp_repository,
             llm,
-            search_engine,
         )
-        self._search_engine = search_engine
         self._sandbox_cls = sandbox_cls
     
     async def create_session(self, user_id: str) -> Session:

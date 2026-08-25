@@ -36,7 +36,6 @@ backend/
    - Browser automation operations (using Playwright)
    - Shell command execution and viewing
    - File read/write operations
-   - Web search integration
 4. **Sandbox Environment**: Use Docker containers to provide isolated execution environments
 5. **VNC Visualization**: Support remote viewing of the sandbox environment via WebSocket connection
 6. **Claw (Manus × Claw)**: Per-user OpenClaw container lifecycle management, chat history merge (MongoDB + OpenClaw `.jsonl` sessions), WebSocket real-time messaging, file upload/resolve, and OpenAI-compatible LLM proxy for Claw containers
@@ -73,11 +72,6 @@ MODEL_PROVIDER=openai                    # Model provider for LangChain
 LLM_PROVIDER=langchain                   # LLM gateway: langchain (default) or openai (OpenAI SDK)
 TEMPERATURE=0.7                          # Model temperature parameter
 MAX_TOKENS=2000                          # Maximum output tokens per model request
-
-# Search engine configuration
-SEARCH_PROVIDER=bing_web                 # baidu / baidu_web / google / bing / bing_web / tavily / serper / custom
-GOOGLE_SEARCH_API_KEY=                   # Google Search API key (SEARCH_PROVIDER=google)
-GOOGLE_SEARCH_ENGINE_ID=                 # Google custom search engine ID (SEARCH_PROVIDER=google)
 
 # Sandbox configuration
 SANDBOX_ADDRESS=                         # Fixed sandbox address (dev); when unset, containers are created per session

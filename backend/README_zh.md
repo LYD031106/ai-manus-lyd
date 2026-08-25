@@ -74,11 +74,6 @@ LLM_PROVIDER=langchain                   # LLM 网关: langchain（默认）或 
 TEMPERATURE=0.7                          # 模型温度参数
 MAX_TOKENS=2000                          # 模型单次请求最大输出 token 数量
 
-# Search engine configuration
-SEARCH_PROVIDER=bing_web                 # baidu / baidu_web / google / bing / bing_web / tavily / serper / custom
-GOOGLE_SEARCH_API_KEY=                   # Google Search API 密钥（SEARCH_PROVIDER=google）
-GOOGLE_SEARCH_ENGINE_ID=                 # Google 自定义搜索引擎 ID（SEARCH_PROVIDER=google）
-
 # Sandbox configuration
 SANDBOX_ADDRESS=                         # 固定沙盒地址（开发用）；未设置时按会话创建容器
 SANDBOX_IMAGE=simpleyyt/manus-sandbox    # 沙盒环境 Docker 镜像

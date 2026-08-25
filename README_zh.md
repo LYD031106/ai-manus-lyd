@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/7b39b828-ec27-4b8f-b5f7-527e29efbe48
 
  * 部署：最小只需要一个 LLM 服务即可完成部署，不需要依赖其它外部服务。
  * Agent 循环：Plan-and-Execute，可组合 System Prompt，以及原生结构化输出工具（不再使用脆弱的 Prompt 内嵌 JSON 协议）。
- * 工具：支持 Terminal、Browser、File、Web Search、消息工具，并支持实时查看和接管，支持外部 MCP 工具集成。
+ * 工具：支持 Terminal、Browser、File、消息工具，并支持实时查看和接管，支持外部 MCP 工具集成。
  * Claw：集成 [OpenClaw](https://github.com/anthropics/openclaw) AI 助手，一键部署、用户隔离容器、自动过期倒计时、完整聊天历史。
  * 沙盒：每个 Task 会分配单独的一个沙盒，沙盒在本地 Docker 环境里面运行。
  * 任务会话：通过 Mongo/Redis 对会话历史进行管理，支持后台任务。

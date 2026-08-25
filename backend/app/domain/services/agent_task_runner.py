@@ -15,7 +15,6 @@ from app.domain.models.event import (
     WaitEvent,
     FileToolContent,
     ShellToolContent,
-    SearchToolContent,
     BrowserToolContent,
     ToolStatus,
     AgentEvent,
@@ -24,7 +23,6 @@ from app.domain.models.event import (
 from app.domain.services.flows.plan_act import PlanActFlow
 from app.domain.external.sandbox import Sandbox
 from app.domain.external.browser import Browser
-from app.domain.external.search import SearchEngine
 from app.domain.external.file import FileStorage
 from app.domain.external.llm import LLM
 from app.domain.repositories.agent_repository import AgentRepository
@@ -35,8 +33,6 @@ from app.domain.repositories.project_repository import ProjectRepository
 from app.domain.models.session import SessionStatus, TaskMode
 from app.domain.models.file import FileInfo
 from app.domain.services.tools.mcp import MCPToolkit
-from app.domain.models.tool_result import ToolResult
-from app.domain.models.search import SearchResults
 from app.domain.services.prompts.system import format_project_instructions
 
 logger = logging.getLogger(__name__)
@@ -55,7 +51,6 @@ class AgentTaskRunner(TaskRunner):
         file_storage: FileStorage,
         mcp_repository: MCPRepository,
         llm: LLM,
-        search_engine: Optional[SearchEngine] = None,
         project_repository: Optional[ProjectRepository] = None,
     ):
         self._session_id = session_id
@@ -63,7 +58,6 @@ class AgentTaskRunner(TaskRunner):
         self._user_id = user_id
         self._sandbox = sandbox
         self._browser = browser
-        self._search_engine = search_engine
         self._repository = agent_repository
         self._session_repository = session_repository
         self._file_storage = file_storage
@@ -80,7 +74,6 @@ class AgentTaskRunner(TaskRunner):
             self._browser,
             self._mcp_tool,
             self._llm,
-            self._search_engine,
             project_repository=self._project_repository,
         )
         # Snapshot file contents before mutating file tools (for Diff/Original views).
@@ -196,10 +189,6 @@ class AgentTaskRunner(TaskRunner):
             if event.status == ToolStatus.CALLED:
                 if event.tool_name == "browser":
                     event.tool_content = BrowserToolContent(screenshot=await self._get_browser_screenshot())
-                elif event.tool_name == "search":
-                    search_results: ToolResult[SearchResults] = event.function_result
-                    logger.debug(f"Search tool results: {search_results}")
-                    event.tool_content = SearchToolContent(results=search_results.data.results)
                 elif event.tool_name == "shell":
                     if "id" in event.function_args:
                         shell_result = await self._sandbox.view_shell(event.function_args["id"], console=True)
@@ -411,7 +400,6 @@ class AgentTaskRunnerFactory(TaskRunnerFactory):
         file_storage: FileStorage,
         mcp_repository: MCPRepository,
         llm: LLM,
-        search_engine: Optional[SearchEngine] = None,
         project_repository: Optional[ProjectRepository] = None,
     ):
         self._agent_repository = agent_repository
@@ -420,7 +408,6 @@ class AgentTaskRunnerFactory(TaskRunnerFactory):
         self._file_storage = file_storage
         self._mcp_repository = mcp_repository
         self._llm = llm
-        self._search_engine = search_engine
         self._project_repository = project_repository
 
     @staticmethod
@@ -455,6 +442,5 @@ class AgentTaskRunnerFactory(TaskRunnerFactory):
             file_storage=self._file_storage,
             mcp_repository=self._mcp_repository,
             llm=self._llm,
-            search_engine=self._search_engine,
             project_repository=self._project_repository,
         )

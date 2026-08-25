@@ -3,7 +3,6 @@ import logging
 from datetime import datetime
 from app.domain.models.session import Session, SessionStatus
 from app.domain.external.sandbox import Sandbox
-from app.domain.external.search import SearchEngine
 from app.domain.models.event import BaseEvent, ErrorEvent, DoneEvent, MessageEvent, WaitEvent, AgentEvent
 from pydantic import TypeAdapter
 from app.domain.repositories.agent_repository import AgentRepository
@@ -33,12 +32,10 @@ class AgentDomainService:
         file_storage: FileStorage,
         mcp_repository: MCPRepository,
         llm: LLM,
-        search_engine: Optional[SearchEngine] = None,
     ):
         self._repository = agent_repository
         self._session_repository = session_repository
         self._sandbox_cls = sandbox_cls
-        self._search_engine = search_engine
         self._task_cls = task_cls
         self._file_storage = file_storage
         self._mcp_repository = mcp_repository
