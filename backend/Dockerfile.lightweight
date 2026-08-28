@@ -1,13 +1,5 @@
 ARG BACKEND_BASE_IMAGE=simpleyyt/manus-backend:latest
 FROM ${BACKEND_BASE_IMAGE}
 
-# The lightweight base image may contain the legacy Web search implementation.
-# Remove it explicitly because COPY does not delete files inherited from a base
-# image, and this deployment intentionally exposes no Web search tool.
-RUN rm -f /app/app/domain/external/search.py \
-    /app/app/domain/models/search.py \
-    /app/app/domain/services/tools/search.py \
-    && rm -rf /app/app/infrastructure/external/search
-
 COPY backend/app /app/app
 COPY builtin_skills/s127-gml/SKILL.md /app/builtin_skills/s127-gml/SKILL.md
