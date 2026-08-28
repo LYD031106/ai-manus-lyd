@@ -44,6 +44,7 @@ def _build_runner_factory():
     from app.domain.services.agent_task_runner import AgentTaskRunnerFactory
     from app.infrastructure.external.sandbox.docker_sandbox import DockerSandbox
     from app.infrastructure.external.file.gridfsfile import get_file_storage
+    from app.infrastructure.external.search import get_search_engine
     from app.infrastructure.external.llm import get_llm
     from app.infrastructure.repositories.mongo_agent_repository import MongoAgentRepository
     from app.infrastructure.repositories.mongo_session_repository import MongoSessionRepository
@@ -57,6 +58,7 @@ def _build_runner_factory():
         file_storage=get_file_storage(),
         mcp_repository=FileMCPRepository(),
         llm=get_llm(),
+        search_engine=get_search_engine(),
         project_repository=MongoProjectRepository(),
     )
 

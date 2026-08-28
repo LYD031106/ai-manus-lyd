@@ -45,6 +45,7 @@
 ## Infrastructure
 
  * [ ] Support Windows & mobile access
+ * [x] Support Bing, Google, Tavily, Serper and other search providers
  * [x] Support Celery task backend (`TASK_BACKEND=celery`)
  * [ ] Support Alibaba Cloud and other file storage providers
  * [ ] Support e2b and other sandbox providers

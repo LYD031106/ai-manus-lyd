@@ -16,6 +16,7 @@ from app.domain.services.agents.planner import PlannerAgent
 from app.domain.services.agents.execution import ExecutionAgent
 from app.domain.external.sandbox import Sandbox
 from app.domain.external.browser import Browser
+from app.domain.external.search import SearchEngine
 from app.domain.external.llm import LLM
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.repositories.session_repository import SessionRepository
@@ -26,6 +27,7 @@ from app.domain.services.tools.shell import ShellToolkit
 from app.domain.services.tools.browser import BrowserToolkit
 from app.domain.services.tools.file import FileToolkit
 from app.domain.services.tools.message import MessageToolkit
+from app.domain.services.tools.search import SearchToolkit
 from app.domain.services.tools.parse_regulation import ParseRegulationToolkit
 
 logger = logging.getLogger(__name__)
@@ -49,6 +51,7 @@ class PlanActFlow(BaseFlow):
         browser: Optional[Browser],
         mcp_tool: MCPToolkit,
         llm: LLM,
+        search_engine: Optional[SearchEngine] = None,
         project_repository: Optional[ProjectRepository] = None,
     ):
         self._agent_id = agent_id
@@ -71,6 +74,10 @@ class PlanActFlow(BaseFlow):
         if browser is not None:
             tools.insert(1, BrowserToolkit(browser))
         
+        # Only add search tool when search_engine is not None
+        if search_engine:
+            tools.append(SearchToolkit(search_engine))
+
         # Create planner and execution agents. The planner only receives a
         # compact capability overview instead of full tool schemas.
         self.planner = PlannerAgent(

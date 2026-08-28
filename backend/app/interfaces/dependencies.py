@@ -5,6 +5,7 @@ from fastapi import Request, Header, HTTPException, status, Depends, Query
 from starlette.websockets import WebSocket
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.infrastructure.external.file.gridfsfile import get_file_storage
+from app.infrastructure.external.search import get_search_engine
 from app.domain.models.user import User, UserRole
 from app.application.errors.exceptions import UnauthorizedError
 from app.core.config import get_settings
@@ -70,6 +71,7 @@ def get_agent_service() -> AgentService:
     sandbox_cls = DockerSandbox
     task_cls = _get_task_cls()
     file_storage = get_file_storage()
+    search_engine = get_search_engine()
     mcp_repository = FileMCPRepository()
     llm = get_llm()
     
@@ -83,6 +85,7 @@ def get_agent_service() -> AgentService:
         file_storage=file_storage,
         mcp_repository=mcp_repository,
         llm=llm,
+        search_engine=search_engine,
         project_repository=MongoProjectRepository(),
     ))
     
@@ -93,6 +96,7 @@ def get_agent_service() -> AgentService:
         sandbox_cls=sandbox_cls,
         task_cls=task_cls,
         file_storage=file_storage,
+        search_engine=search_engine,
         mcp_repository=mcp_repository,
         llm=llm,
         file_favorite_repository=MongoFileFavoriteRepository(),

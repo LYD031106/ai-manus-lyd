@@ -45,6 +45,7 @@
 ## 基建
 
  * [ ] 支持 Windows & 手机接入
+ * [x] 支持 Bing、Google、Tavily、Serper 等搜索提供商
  * [x] 支持 Celery 任务后端（`TASK_BACKEND=celery`）
  * [ ] 支持阿里云等文件存储提供商
  * [ ] 支持 e2b 等沙盒提供商
