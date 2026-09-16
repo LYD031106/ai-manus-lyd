@@ -206,6 +206,13 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 | 桥区水域 + 禁锚/限速等规定 | 建 `RestrictedAreaNavigational` 并用 `restriction` 枚举；净空高 / 禁止会遇等无枚举需求才用 `WaterwayArea`（净空信息填 `textContent`） |
 | 富余水深，不同条件 | 每个条件各建一个 `UCAA`，即使几何完全相同 |
 | 船舶避险推荐水域 | `PlaceOfRefuge` |
+| 弯曲航段 / 弯道 | `RestrictedAreaNavigational`，`restriction=speed restricted`，命名 `No.N Curved Fairway Section` |
+| 掉头区（限定船型） | `RestrictedAreaNavigational` + `permission`→Applicability，不填 `restriction` |
+| 待闸锚地 / 枢纽水域限速 | `RestrictedAreaNavigational`，`restriction=speed restricted` |
+| 禁鸣时段水域 | `RestrictedAreaNavigational`（`restriction` 不填，textContent 填时段） |
+| 前后船安全距离 / 避让规则 | `WaterwayArea` + `dynamicResource=static` |
+| 富余水深数值 | `UCAA`，`underkeelAllowance` 填 `underkeelAllowanceFixed` + `operation=smallest value` |
+| 内河航道通航安全管理规定 | 见 `references/05-专题配方.md` §10（平陆运河参照配方） |
 
 ### ④ 编码属性
 - 一律**先英文后中文**；复合属性里的 `language` 用 ISO 639-3（`eng` / `zho`）
@@ -303,6 +310,7 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 | 船舶安全监督规则 | `SSSR` | `127CN00SZ_SSSR001` |
 | 桥区水域 | `BA` | `127CN00XMBA002` |
 | 避险推荐水域 | `WRVEW` | `127CN00PTWRVEW001` |
+| 内河航道通航安全管理规定 | `PLCANAL` | `127CN00PLCANAL002` |
 
 ## 要素清单 JSON 结构
 
