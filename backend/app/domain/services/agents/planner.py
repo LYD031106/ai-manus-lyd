@@ -1,5 +1,6 @@
 from typing import AsyncGenerator, Optional
 import logging
+from contextlib import aclosing
 from app.domain.models.plan import Plan, Step
 from app.domain.models.message import Message
 from app.domain.models.agent_output import PlanOutput, PlanUpdateOutput
@@ -78,39 +79,41 @@ class PlannerAgent(BaseAgent):
             message=message.message,
             attachments="\n".join(message.attachments)
         )
-        async for event in self.execute(request, output_tool=CREATE_PLAN_TOOL):
-            if isinstance(event, StructuredOutputEvent):
-                output: PlanOutput = event.output
-                logger.info(f"Planner created plan: {output.title}")
-                plan = Plan.model_validate(output.model_dump())
-                yield PlanEvent(status=PlanStatus.CREATED, plan=plan)
-            else:
-                yield event
+        async with aclosing(self.execute(request, output_tool=CREATE_PLAN_TOOL)) as events:
+            async for event in events:
+                if isinstance(event, StructuredOutputEvent):
+                    output: PlanOutput = event.output
+                    logger.info(f"Planner created plan: {output.title}")
+                    plan = Plan.model_validate(output.model_dump())
+                    yield PlanEvent(status=PlanStatus.CREATED, plan=plan)
+                else:
+                    yield event
 
     async def update_plan(self, plan: Plan, step: Step) -> AsyncGenerator[BaseEvent, None]:
         request = UPDATE_PLAN_PROMPT.format(plan=plan.dump_json(), step=step.model_dump_json())
-        async for event in self.execute(request, output_tool=UPDATE_PLAN_TOOL):
-            if isinstance(event, StructuredOutputEvent):
-                output: PlanUpdateOutput = event.output
-                logger.debug(f"Planner updated plan: {output}")
-                new_steps = [Step.model_validate(s.model_dump()) for s in output.steps]
+        async with aclosing(self.execute(request, output_tool=UPDATE_PLAN_TOOL)) as events:
+            async for event in events:
+                if isinstance(event, StructuredOutputEvent):
+                    output: PlanUpdateOutput = event.output
+                    logger.debug(f"Planner updated plan: {output}")
+                    new_steps = [Step.model_validate(s.model_dump()) for s in output.steps]
 
-                # Find the index of the first pending step
-                first_pending_index = None
-                for i, existing_step in enumerate(plan.steps):
-                    if not existing_step.is_done():
-                        first_pending_index = i
-                        break
+                    # Find the index of the first pending step
+                    first_pending_index = None
+                    for i, existing_step in enumerate(plan.steps):
+                        if not existing_step.is_done():
+                            first_pending_index = i
+                            break
 
-                # If there are pending steps, replace all pending steps
-                if first_pending_index is not None:
-                    # Keep completed steps
-                    updated_steps = plan.steps[:first_pending_index]
-                    # Add new steps
-                    updated_steps.extend(new_steps)
-                    # Update steps in plan
-                    plan.steps = updated_steps
+                    # If there are pending steps, replace all pending steps
+                    if first_pending_index is not None:
+                        # Keep completed steps
+                        updated_steps = plan.steps[:first_pending_index]
+                        # Add new steps
+                        updated_steps.extend(new_steps)
+                        # Update steps in plan
+                        plan.steps = updated_steps
 
-                yield PlanEvent(status=PlanStatus.UPDATED, plan=plan)
-            else:
-                yield event
+                    yield PlanEvent(status=PlanStatus.UPDATED, plan=plan)
+                else:
+                    yield event

@@ -9,6 +9,7 @@ from app.infrastructure.external.session_list import (
     publish_session_remove,
     publish_session_upsert,
 )
+from app.infrastructure.storage.session_event_store import MongoSessionEventStore
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,24 +29,59 @@ SESSION_LIST_PROJECTION = {
     "task_mode": 1,
 }
 
+SESSION_HISTORY_PROJECTION = {
+    "session_id": 1, "user_id": 1, "agent_id": 1, "title": 1,
+    "status": 1, "is_shared": 1, "task_mode": 1, "events": 1,
+}
+
 class MongoSessionRepository(SessionRepository):
     """MongoDB implementation of SessionRepository"""
-    
-    async def save(self, session: Session) -> None:
-        """Save or update a session"""
-        mongo_session = await SessionDocument.find_one(
-            SessionDocument.session_id == session.id
+
+    def __init__(self, event_store=None):
+        self._event_store = event_store
+
+    @property
+    def event_store(self):
+        if self._event_store is None:
+            self._event_store = MongoSessionEventStore(
+                SessionDocument.get_pymongo_collection().database
+            )
+        return self._event_store
+
+    async def _to_domain_with_events(self, mongo_session):
+        if mongo_session is None:
+            return None
+        domain = mongo_session.to_domain()
+        events = await self.event_store.load(
+            domain.id, [event.model_dump() for event in domain.events]
         )
-        
-        if not mongo_session:
-            mongo_session = SessionDocument.from_domain(session)
-            await mongo_session.save()
-            await publish_session_upsert(session.user_id, session.id)
-            return
-        
-        # Update fields from session domain model
-        mongo_session.update_from_domain(session)
-        await mongo_session.save()
+        return Session.model_validate({**domain.model_dump(exclude={"events"}), "events": events})
+
+    async def migrate_legacy_events(self, session_id: str) -> int:
+        return await self.event_store.migrate_legacy_events(session_id)
+
+    async def save(self, session: Session) -> None:
+        """Write metadata without copying hydrated history into one BSON document."""
+        collection = SessionDocument.get_pymongo_collection()
+        existing = await collection.find_one({"session_id": session.id}, {"_id": 1})
+        if existing:
+            await self.migrate_legacy_events(session.id)
+        data = session.model_dump(exclude={"id", "events", "created_at"})
+        data["updated_at"] = datetime.now(UTC)
+        await collection.update_one(
+            {"session_id": session.id},
+            {"$set": data, "$setOnInsert": {
+                "session_id": session.id, "created_at": session.created_at,
+                "events": [], "event_storage_version": 1,
+            }},
+            upsert=True,
+        )
+        # Existing session saves update task/sandbox metadata. Their hydrated
+        # events are an old snapshot, not a new append request (and validation
+        # can have filled defaults absent from historical payloads).
+        if not existing:
+            for event in session.events:
+                await self.event_store.append(session.id, event.model_dump())
         await publish_session_upsert(session.user_id, session.id)
 
     async def _notify_upsert(self, session_id: str) -> None:
@@ -76,14 +112,14 @@ class MongoSessionRepository(SessionRepository):
         mongo_session = await SessionDocument.find_one(
             SessionDocument.session_id == session_id
         )
-        return mongo_session.to_domain() if mongo_session else None
+        return await self._to_domain_with_events(mongo_session)
     
     async def find_by_user_id(self, user_id: str) -> List[Session]:
         """Find all sessions for a specific user"""
         mongo_sessions = await SessionDocument.find(
             SessionDocument.user_id == user_id
         ).sort("-latest_message_at").to_list()
-        return [mongo_session.to_domain() for mongo_session in mongo_sessions]
+        return [await self._to_domain_with_events(mongo_session) for mongo_session in mongo_sessions]
 
     async def find_summaries_by_user_id(self, user_id: str) -> List[SessionSummary]:
         """Find lightweight session summaries for a user (excludes events/files)"""
@@ -116,7 +152,22 @@ class MongoSessionRepository(SessionRepository):
             SessionDocument.session_id == session_id,
             SessionDocument.user_id == user_id
         )
-        return mongo_session.to_domain() if mongo_session else None
+        return await self._to_domain_with_events(mongo_session)
+
+    async def find_history_by_id_and_user_id(self, session_id: str, user_id: str) -> Optional[Session]:
+        """Load only the event payload needed to restore a chat page."""
+        collection = SessionDocument.get_pymongo_collection()
+        document = await collection.find_one(
+            {"session_id": session_id, "user_id": user_id},
+            SESSION_HISTORY_PROJECTION,
+        )
+        if not document:
+            return None
+
+        # Beanie's document model supplies defaults for fields omitted by the
+        # projection (files, timestamps, counters, etc.).
+        mongo_session = SessionDocument.model_validate(document)
+        return await self._to_domain_with_events(mongo_session)
     
     async def update_title(self, session_id: str, title: str) -> None:
         """Update the title of a session"""
@@ -141,13 +192,13 @@ class MongoSessionRepository(SessionRepository):
         await self._notify_upsert(session_id)
 
     async def add_event(self, session_id: str, event: BaseEvent) -> None:
-        """Add an event to a session"""
-        result = await SessionDocument.find_one(
-            SessionDocument.session_id == session_id
-        ).update(
-            {"$push": {"events": event.model_dump()}, "$set": {"updated_at": datetime.now(UTC)}}
+        """Persist an event separately; retrying its stable ID is idempotent."""
+        await self.migrate_legacy_events(session_id)
+        await self.event_store.append(session_id, event.model_dump())
+        result = await SessionDocument.get_pymongo_collection().update_one(
+            {"session_id": session_id}, {"$set": {"updated_at": datetime.now(UTC)}}
         )
-        if not result:
+        if not result.matched_count:
             raise ValueError(f"Session {session_id} not found")
     
     async def add_file(self, session_id: str, file_info: FileInfo) -> None:
@@ -193,11 +244,12 @@ class MongoSessionRepository(SessionRepository):
             user_id = mongo_session.user_id
             await mongo_session.delete()
             await publish_session_remove(user_id, session_id)
+        await self.event_store.delete(session_id)
 
     async def get_all(self) -> List[Session]:
         """Get all sessions"""
         mongo_sessions = await SessionDocument.find().sort("-latest_message_at").to_list()
-        return [mongo_session.to_domain() for mongo_session in mongo_sessions]
+        return [await self._to_domain_with_events(mongo_session) for mongo_session in mongo_sessions]
     
     async def update_status(self, session_id: str, status: SessionStatus) -> None:
         """Update the status of a session"""

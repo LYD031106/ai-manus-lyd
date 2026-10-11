@@ -201,7 +201,8 @@ class OpenAILLM:
         response_format: Optional[str] = None,
         tool_choice: Optional[str] = None,
     ) -> LLMMessage:
-        payload = self._to_openai(messages)
+        original_payload = self._to_openai(messages)
+        payload = original_payload
         for attempt in range(self._max_retries):
             raw = await self._create(payload, tools, response_format, tool_choice)
             try:
@@ -218,9 +219,10 @@ class OpenAILLM:
                     e,
                 )
                 if attempt > 0:
-                    # Append the failed assistant turn plus corrective feedback.
-                    payload = payload + [
-                        raw.model_dump(exclude_none=True),
+                    # The failed response was never executed. Keep its tool
+                    # calls out of history and retry from the original context
+                    # with ordinary feedback, preserving tool-call pairing.
+                    payload = original_payload + [
                         {
                             "role": "user",
                             "content": _TOOL_ARGS_RETRY_PROMPT.format(

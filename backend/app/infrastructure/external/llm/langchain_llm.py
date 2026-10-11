@@ -137,7 +137,8 @@ class LangchainLLM:
         # model, silently first then with error feedback.
         chain = model | RobustJsonParser.from_llm(self._model)
 
-        context = self._to_langchain(messages)
+        original_context = self._to_langchain(messages)
+        context = original_context
         message: Optional[AIMessage] = None
         for attempt in range(self._max_retries):
             try:
@@ -152,8 +153,9 @@ class LangchainLLM:
                     self._max_retries,
                 )
                 if attempt > 0:
-                    # Stage 5: append the failed message and error feedback.
-                    context = e.make_retry_context(context)
+                    # Stage 5: add feedback to the valid original context;
+                    # failed, unexecuted tool calls must stay out of history.
+                    context = e.make_retry_context(original_context)
 
         logger.debug("Response from model: %s", message)
         return self._from_langchain(message)

@@ -1,4 +1,5 @@
 from typing import AsyncGenerator, List
+from contextlib import aclosing
 from app.domain.models.plan import Plan, Step, ExecutionStatus
 from app.domain.models.file import FileInfo
 from app.domain.models.message import Message
@@ -76,44 +77,62 @@ class ExecutionAgent(BaseAgent):
         )
         step.status = ExecutionStatus.RUNNING
         yield StepEvent(status=StepStatus.STARTED, step=step)
-        async for event in self.execute(request, output_tool=COMPLETE_STEP_TOOL):
-            if isinstance(event, ErrorEvent):
-                step.status = ExecutionStatus.FAILED
-                step.error = event.error
-                yield StepEvent(status=StepStatus.FAILED, step=step)
-            elif isinstance(event, StructuredOutputEvent):
-                report: StepReport = event.output
-                step.status = ExecutionStatus.COMPLETED
-                step.success = report.success
-                step.result = report.result
-                step.attachments = report.attachments
-                yield StepEvent(status=StepStatus.COMPLETED, step=step)
-                if step.result:
-                    yield MessageEvent(message=step.result)
-                continue
-            elif isinstance(event, MessageEvent):
-                # Plain assistant text without a step report: surface it but
-                # keep the step lifecycle driven by complete_step.
-                continue
-            elif isinstance(event, ToolEvent):
-                if event.function_name == "message_ask_user":
+        try:
+            async with aclosing(self.execute(request, output_tool=COMPLETE_STEP_TOOL)) as events:
+                async for event in events:
+                    if isinstance(event, ErrorEvent):
+                        step.status = ExecutionStatus.FAILED
+                        step.success = False
+                        step.error = event.error
+                        yield StepEvent(status=StepStatus.FAILED, step=step)
+                        yield event
+                        return
+                    elif isinstance(event, StructuredOutputEvent):
+                        report: StepReport = event.output
+                        step.status = ExecutionStatus.COMPLETED
+                        step.success = report.success
+                        step.result = report.result
+                        step.attachments = report.attachments
+                        yield StepEvent(status=StepStatus.COMPLETED, step=step)
+                        if step.result:
+                            yield MessageEvent(message=step.result)
+                        continue
+                    elif isinstance(event, MessageEvent):
+                        continue
+                    elif isinstance(event, ToolEvent):
+                        if event.function_name == "message_ask_user":
+                            if event.status == ToolStatus.CALLING:
+                                yield MessageEvent(message=event.function_args.get("text", ""))
+                            elif event.status == ToolStatus.CALLED:
+                                yield WaitEvent()
+                                return
+                            continue
+                    yield event
+        except Exception as exc:
+            logger.exception("Step %s failed", step.id)
+            step.status = ExecutionStatus.FAILED
+            step.success = False
+            step.error = str(exc)
+            yield StepEvent(status=StepStatus.FAILED, step=step)
+            yield ErrorEvent(error=str(exc))
+            return
+
+    async def summarize(self) -> AsyncGenerator[BaseEvent, None]:
+        async with aclosing(self.execute(SUMMARIZE_PROMPT, output_tool=DELIVER_RESULT_TOOL)) as events:
+            async for event in events:
+                if isinstance(event, StructuredOutputEvent):
+                    result: FinalResult = event.output
+                    logger.debug(f"Execution agent summary: {result.message}")
+                    attachments = [FileInfo(file_path=file_path) for file_path in result.attachments]
+                    yield MessageEvent(message=result.message, attachments=attachments)
+                    continue
+                if isinstance(event, MessageEvent):
+                    continue
+                if isinstance(event, ToolEvent) and event.function_name == "message_ask_user":
                     if event.status == ToolStatus.CALLING:
                         yield MessageEvent(message=event.function_args.get("text", ""))
                     elif event.status == ToolStatus.CALLED:
                         yield WaitEvent()
                         return
                     continue
-            yield event
-        step.status = ExecutionStatus.COMPLETED
-
-    async def summarize(self) -> AsyncGenerator[BaseEvent, None]:
-        async for event in self.execute(SUMMARIZE_PROMPT, output_tool=DELIVER_RESULT_TOOL):
-            if isinstance(event, StructuredOutputEvent):
-                result: FinalResult = event.output
-                logger.debug(f"Execution agent summary: {result.message}")
-                attachments = [FileInfo(file_path=file_path) for file_path in result.attachments]
-                yield MessageEvent(message=result.message, attachments=attachments)
-                continue
-            if isinstance(event, MessageEvent):
-                continue
-            yield event
+                yield event

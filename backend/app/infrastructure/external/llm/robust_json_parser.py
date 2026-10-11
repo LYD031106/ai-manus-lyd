@@ -18,7 +18,7 @@ caller can catch it and implement model-level retries (stages 4-5):
 
   Stage 4 — silent model retry   : re-invoke the chain without extra context
                                    (mirrors RetryOutputParser).
-  Stage 5 — error model retry    : re-invoke with the failed AIMessage and
+  Stage 5 — error model retry    : re-invoke the original context with
                                    error details appended (mirrors
                                    RetryWithErrorOutputParser).
 
@@ -70,15 +70,15 @@ class ToolCallParseError(OutputParserException):
         """Build a stage-5 context by appending error feedback to *context*.
 
         Args:
-            context: Current conversation messages.
+            context: Original conversation messages, before the failed response.
 
         Returns:
-            A new list with the failed AIMessage and a corrective HumanMessage
-            appended, ready to be passed back to the model.
+            A new list with a corrective HumanMessage appended. Failed tool
+            calls were never executed and must not enter the conversation as
+            assistant tool calls requiring responses.
         """
         error_str = "\n\n".join(self.error_details)
         return context + [
-            self.invalid_message,
             HumanMessage(content=_RETRY_WITH_ERROR_TEMPLATE.format(error=error_str)),
         ]
 
