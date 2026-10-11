@@ -1,4 +1,5 @@
 import logging
+from contextlib import aclosing
 from app.domain.services.flows.base import BaseFlow
 from app.domain.models.message import Message
 from typing import AsyncGenerator, Optional
@@ -10,6 +11,8 @@ from app.domain.models.event import (
     MessageEvent,
     DoneEvent,
     TitleEvent,
+    ErrorEvent,
+    WaitEvent,
 )
 from app.domain.models.plan import ExecutionStatus
 from app.domain.services.agents.planner import PlannerAgent
@@ -108,6 +111,39 @@ class PlanActFlow(BaseFlow):
         await self.executor.sync_system_prompt()
 
     async def run(self, message: Message) -> AsyncGenerator[BaseEvent, None]:
+        try:
+            async with aclosing(self._run(message)) as events:
+                async for event in events:
+                    if isinstance(event, ErrorEvent):
+                        self._mark_failed(event.error)
+                        if self.plan:
+                            yield PlanEvent(status=PlanStatus.UPDATED, plan=self.plan)
+                        yield event
+                        return
+                    yield event
+                    if isinstance(event, WaitEvent):
+                        # Waiting ends this run even when the consumer keeps
+                        # reading; do not advance or complete the plan.
+                        return
+        except Exception as exc:
+            logger.exception("Agent %s flow failed", self._agent_id)
+            self._mark_failed(str(exc))
+            if self.plan:
+                yield PlanEvent(status=PlanStatus.UPDATED, plan=self.plan)
+            yield ErrorEvent(error=str(exc))
+
+    def _mark_failed(self, error: str) -> None:
+        self.status = AgentStatus.IDLE
+        if self.plan:
+            self.plan.status = ExecutionStatus.FAILED
+            self.plan.error = error
+            for step in self.plan.steps:
+                if step.status == ExecutionStatus.RUNNING:
+                    step.status = ExecutionStatus.FAILED
+                    step.success = False
+                    step.error = error
+
+    async def _run(self, message: Message) -> AsyncGenerator[BaseEvent, None]:
 
         # TODO: move to task runner
         session = await self._session_repository.find_by_id(self._session_id)
@@ -141,16 +177,17 @@ class PlanActFlow(BaseFlow):
             elif self.status == AgentStatus.PLANNING:
                 # Create plan
                 logger.info(f"Agent {self._agent_id} started creating plan")
-                async for event in self.planner.create_plan(message):
-                    if isinstance(event, PlanEvent) and event.status == PlanStatus.CREATED:
-                        self.plan = event.plan
-                        logger.info(f"Agent {self._agent_id} created plan successfully with {len(event.plan.steps)} steps")
-                        if event.plan.title and event.plan.title.strip():
-                            yield TitleEvent(title=event.plan.title)
-                        # Skip empty planner acknowledgements (bad LLM stubs)
-                        if event.plan.message and event.plan.message.strip():
-                            yield MessageEvent(role="assistant", message=event.plan.message)
-                    yield event
+                async with aclosing(self.planner.create_plan(message)) as events:
+                    async for event in events:
+                        if isinstance(event, PlanEvent) and event.status == PlanStatus.CREATED:
+                            self.plan = event.plan
+                            logger.info(f"Agent {self._agent_id} created plan successfully with {len(event.plan.steps)} steps")
+                            if event.plan.title and event.plan.title.strip():
+                                yield TitleEvent(title=event.plan.title)
+                            # Skip empty planner acknowledgements (bad LLM stubs)
+                            if event.plan.message and event.plan.message.strip():
+                                yield MessageEvent(role="assistant", message=event.plan.message)
+                        yield event
                 logger.info(f"Agent {self._agent_id} state changed from {AgentStatus.PLANNING} to {AgentStatus.EXECUTING}")
                 self.status = AgentStatus.EXECUTING
                 if len(event.plan.steps) == 0:
@@ -167,8 +204,9 @@ class PlanActFlow(BaseFlow):
                     continue
                 # Execute step
                 logger.info(f"Agent {self._agent_id} started executing step {step.id}: {step.description[:50]}...")
-                async for event in self.executor.execute_step(self.plan, step, message):
-                    yield event
+                async with aclosing(self.executor.execute_step(self.plan, step, message)) as events:
+                    async for event in events:
+                        yield event
                 logger.info(f"Agent {self._agent_id} completed step {step.id}, state changed from {AgentStatus.EXECUTING} to {AgentStatus.UPDATING}")
                 await self.executor.compact_memory()
                 logger.debug(f"Agent {self._agent_id} compacted memory")
@@ -176,15 +214,17 @@ class PlanActFlow(BaseFlow):
             elif self.status == AgentStatus.UPDATING:
                 # Update plan
                 logger.info(f"Agent {self._agent_id} started updating plan")
-                async for event in self.planner.update_plan(self.plan, step):
-                    yield event
+                async with aclosing(self.planner.update_plan(self.plan, step)) as events:
+                    async for event in events:
+                        yield event
                 logger.info(f"Agent {self._agent_id} plan update completed, state changed from {AgentStatus.UPDATING} to {AgentStatus.EXECUTING}")
                 self.status = AgentStatus.EXECUTING
             elif self.status == AgentStatus.SUMMARIZING:
                 # Conclusion
                 logger.info(f"Agent {self._agent_id} started summarizing")
-                async for event in self.executor.summarize():
-                    yield event
+                async with aclosing(self.executor.summarize()) as events:
+                    async for event in events:
+                        yield event
                 logger.info(f"Agent {self._agent_id} summarizing completed, state changed from {AgentStatus.SUMMARIZING} to {AgentStatus.COMPLETED}")
                 self.status = AgentStatus.COMPLETED
             elif self.status == AgentStatus.COMPLETED:

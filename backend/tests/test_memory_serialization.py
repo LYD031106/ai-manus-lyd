@@ -80,6 +80,22 @@ class TestLegacyLangChainFormat:
 
 
 class TestNativeAndRoundTrip:
+    def test_unfinished_call_state_round_trip(self):
+        memory = Memory(
+            messages=[LLMMessage.assistant("", tool_calls=[
+                ToolCall(id="question", name="message_ask_user", args={"text": "Proceed?"}),
+            ])],
+            tool_call_states={"question": "waiting_user"},
+            waiting_tool_call_id="question",
+        )
+        restored = deserialize_memory(serialize_memory(memory))
+        assert restored.tool_call_states == {"question": "waiting_user"}
+        assert restored.waiting_tool_call_id == "question"
+        restored.repair_tool_pairs(user_reply="yes")
+        assert restored.tool_call_states == {}
+        assert restored.waiting_tool_call_id is None
+        restored.validate_tool_pairs()
+
     def test_empty_and_none(self):
         assert deserialize_memory(None).messages == []
         assert deserialize_memory({}).messages == []

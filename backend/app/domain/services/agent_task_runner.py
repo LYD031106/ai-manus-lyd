@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional, AsyncGenerator, List, Type
+from contextlib import aclosing
 import asyncio
 import logging
 import os
@@ -278,18 +279,21 @@ class AgentTaskRunner(TaskRunner):
                 )
                 
                 flow = self._run_chat(message_obj) if is_chat else self._run_flow(message_obj)
-                async for event in flow:
-                    await self._put_and_add_event(task, event)
-                    if isinstance(event, TitleEvent):
-                        await self._session_repository.update_title(self._session_id, event.title)
-                    elif isinstance(event, MessageEvent):
-                        await self._session_repository.update_latest_message(self._session_id, event.message, event.timestamp)
-                        await self._session_repository.increment_unread_message_count(self._session_id)
-                    elif isinstance(event, WaitEvent):
-                        await self._session_repository.update_status(self._session_id, SessionStatus.WAITING)
-                        return
-                    if not await task.input_stream.is_empty():
-                        break
+                # Finish generator cleanup before a queued message can reuse
+                # the same agents, including waits, cancellation and errors.
+                async with aclosing(flow):
+                    async for event in flow:
+                        await self._put_and_add_event(task, event)
+                        if isinstance(event, TitleEvent):
+                            await self._session_repository.update_title(self._session_id, event.title)
+                        elif isinstance(event, MessageEvent):
+                            await self._session_repository.update_latest_message(self._session_id, event.message, event.timestamp)
+                            await self._session_repository.increment_unread_message_count(self._session_id)
+                        elif isinstance(event, WaitEvent):
+                            await self._session_repository.update_status(self._session_id, SessionStatus.WAITING)
+                            return
+                        if not await task.input_stream.is_empty():
+                            break
 
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
         except asyncio.CancelledError:
@@ -360,13 +364,14 @@ class AgentTaskRunner(TaskRunner):
             yield ErrorEvent(error="No message")
             return
 
-        async for event in self._flow.run(message):
-            if isinstance(event, ToolEvent):
-                # TODO: move to tool function
-                await self._handle_tool_event(event)
-            elif isinstance(event, MessageEvent):
-                await self._sync_message_attachments_to_storage(event)
-            yield event
+        async with aclosing(self._flow.run(message)) as flow:
+            async for event in flow:
+                if isinstance(event, ToolEvent):
+                    # TODO: move to tool function
+                    await self._handle_tool_event(event)
+                elif isinstance(event, MessageEvent):
+                    await self._sync_message_attachments_to_storage(event)
+                yield event
 
         logger.info(f"Agent {self._agent_id} completed processing one message")
 

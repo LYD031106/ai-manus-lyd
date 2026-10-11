@@ -115,7 +115,7 @@ class SessionDocument(BaseDocument[Session], id_field="session_id", domain_model
     latest_message_at: Optional[datetime] = None
     created_at: datetime = datetime.now(timezone.utc)
     updated_at: datetime = datetime.now(timezone.utc)
-    events: List[AgentEvent]
+    events: List[AgentEvent] = Field(default_factory=list)
     status: SessionStatus
     files: List[FileInfo] = []
     is_shared: Optional[bool] = False

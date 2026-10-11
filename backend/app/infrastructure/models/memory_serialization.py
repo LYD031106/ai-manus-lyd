@@ -98,7 +98,11 @@ def deserialize_memory(raw: Optional[Dict[str, Any]]) -> Memory:
         return Memory()
     raw_messages: List[Any] = raw.get("messages", []) or []
     messages = [LLMMessage.model_validate(_upgrade_message(m)) for m in raw_messages]
-    return Memory(messages=messages)
+    return Memory(
+        messages=messages,
+        tool_call_states=raw.get("tool_call_states") or {},
+        waiting_tool_call_id=raw.get("waiting_tool_call_id"),
+    )
 
 
 def serialize_memory(memory: Memory) -> Dict[str, Any]:

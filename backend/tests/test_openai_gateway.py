@@ -6,6 +6,7 @@ both directions, plus its local JSON extraction/repair helpers. These tests
 build the client without making any network calls.
 """
 import json
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
@@ -148,3 +149,85 @@ class TestParseJsonLocal:
     async def test_local_extraction_no_network(self):
         gw = _gateway()
         assert await gw.parse_json('{"ok": true}') == {"ok": True}
+
+
+def _assert_tool_pairing(payload):
+    """Enforce the provider's message protocol for each captured request."""
+    pending = set()
+    for message in payload:
+        if message["role"] == "tool":
+            assert message["tool_call_id"] in pending
+            pending.remove(message["tool_call_id"])
+        else:
+            assert not pending, "Assistant tool calls must be answered before the next turn"
+            calls = message.get("tool_calls") or []
+            pending = {call["id"] for call in calls}
+            assert len(pending) == len(calls)
+    assert not pending
+
+
+class TestToolArgumentRetries:
+    @pytest.mark.parametrize("failed_attempts", [0, 1, 2, 3])
+    async def test_retry_requests_preserve_tool_pairing(self, monkeypatch, failed_attempts):
+        gw = _gateway()
+        gw._max_retries = max(3, failed_attempts + 1)
+        messages = [
+            LLMMessage.system("sys"),
+            LLMMessage.user("first task"),
+            LLMMessage.assistant(tool_calls=[ToolCall(id="completed", name="file_read", args={"file": "/old"})]),
+            LLMMessage.tool(tool_call_id="completed", name="file_read", content="done"),
+            LLMMessage.user("next task"),
+        ]
+        original = [message.model_dump() for message in messages]
+        original_payload = gw._to_openai(messages)
+        requests = []
+        tools = [{"type": "function", "function": {"name": "file_read", "parameters": {"type": "object"}}}]
+
+        async def fake_create(payload, request_tools, response_format, tool_choice):
+            _assert_tool_pairing(payload)
+            requests.append(deepcopy(payload))
+            assert request_tools == tools
+            assert response_format is None
+            assert tool_choice == "required"
+            if len(requests) <= failed_attempts:
+                # A mixed response must be retried in full. Even its valid call
+                # has not executed and cannot become pending request history.
+                raw = _resp(tool_calls=[("file_read", '{"file": "/valid"}'), ("file_write", "invalid-json")])
+                raw.model_dump = lambda **kwargs: {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [{"id": call.id, "type": "function", "function": {
+                        "name": call.function.name, "arguments": call.function.arguments,
+                    }} for call in raw.tool_calls],
+                }
+                return raw
+            return _resp(tool_calls=[("file_read", '{"file": "/success"}')])
+
+        monkeypatch.setattr(gw, "_create", fake_create)
+        result = await gw.ask(messages, tools=tools, tool_choice="required")
+
+        assert len(requests) == failed_attempts + 1
+        assert result.tool_calls[0].args == {"file": "/success"}
+        assert requests[0] == original_payload
+        if failed_attempts:
+            assert requests[1] == original_payload  # First retry remains silent.
+        for payload in requests[2:]:
+            assert payload[:-1] == original_payload
+            assert payload[-1]["role"] == "user"
+            assert "file_write" in payload[-1]["content"]
+            assert "invalid-json" in payload[-1]["content"]
+        assert [message.model_dump() for message in messages] == original
+
+    async def test_exhaustion_reports_parse_error_with_valid_requests(self, monkeypatch):
+        gw = _gateway()
+        requests = []
+
+        async def fake_create(payload, *args):
+            _assert_tool_pairing(payload)
+            requests.append(deepcopy(payload))
+            return _resp(tool_calls=[("file_write", "invalid-json")])
+
+        monkeypatch.setattr(gw, "_create", fake_create)
+        with pytest.raises(_ToolArgsParseError, match="file_write"):
+            await gw.ask([LLMMessage.user("task")])
+        assert len(requests) == 3
