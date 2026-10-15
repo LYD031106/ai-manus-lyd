@@ -1,5 +1,7 @@
 # AI Manus
 
+当前定制版的远程 Docker 部署入口见 [DEPLOYMENT.md](DEPLOYMENT.md)，日常运维见 [Docker 运维手册](docs/operations-docker-zh.md)。
+
 [English](README.md) | 中文 | [官方网站](https://ai-manus.com) | [文档](https://docs.ai-manus.com)
 
 [![GitHub stars](https://img.shields.io/github/stars/simpleyyt/ai-manus?style=social)](https://github.com/simpleyyt/ai-manus/stargazers)

@@ -32,6 +32,7 @@ SESSION_LIST_PROJECTION = {
 SESSION_HISTORY_PROJECTION = {
     "session_id": 1, "user_id": 1, "agent_id": 1, "title": 1,
     "status": 1, "is_shared": 1, "task_mode": 1, "events": 1,
+    "is_favorite": 1, "is_pinned": 1, "project_id": 1,
 }
 
 class MongoSessionRepository(SessionRepository):

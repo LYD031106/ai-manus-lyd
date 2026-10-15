@@ -21,7 +21,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        component: [frontend, backend, sandbox, claw]
+        include:
+          - component: frontend
+            context: ./frontend
+          - component: backend
+            context: .
+          - component: sandbox
+            context: .
+          - component: claw
+            context: ./claw
     
     steps:
       - name: Checkout code
@@ -54,7 +62,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./${{ matrix.component }}
+          context: ${{ matrix.context }}
           file: ./${{ matrix.component }}/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}

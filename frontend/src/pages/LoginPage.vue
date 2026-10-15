@@ -40,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Bot } from 'lucide-vue-next'
@@ -78,22 +78,27 @@ const switchToReset = () => {
 }
 
 // Handle successful login/registration
-const handleLoginSuccess = () => {
-    const redirect = router.currentRoute.value.query.redirect as string
-    router.push(redirect || '/')
+const getPostLoginTarget = () => {
+  const redirect = router.currentRoute.value.query.redirect
+  if (
+    typeof redirect === 'string'
+    && redirect.startsWith('/')
+    && !redirect.startsWith('//')
+    && !redirect.startsWith('/login')
+  ) {
+    return redirect
+  }
+  return '/chat'
 }
 
-// Listen for authentication state changes
-watch(isAuthenticated, (authenticated) => {
-  if (authenticated) {
-    handleLoginSuccess()
-  }
-})
+const handleLoginSuccess = async () => {
+  await router.replace(getPostLoginTarget())
+}
 
 // Check if already logged in when page loads
 onMounted(() => {
   if (isAuthenticated.value) {
-    router.push('/')
+    void handleLoginSuccess()
   }
 })
 </script>

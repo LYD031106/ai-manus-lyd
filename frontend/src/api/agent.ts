@@ -192,7 +192,7 @@ export const chatWithSession = async (
   const { getChatWebSocket } = await import('./chatWs');
   const ws = getChatWebSocket();
 
-  ws.setHandlers(sessionId, {
+  const clearHandlers = ws.setHandlers(sessionId, {
     onOpen: () => callbacks?.onOpen?.(),
     onEvent: ({ event, data }) => {
       // status_update is delivered via onStatusUpdate; skip duplicate onMessage
@@ -222,9 +222,7 @@ export const chatWithSession = async (
     await ws.joinSession(sessionId, eventId);
   }
 
-  return () => {
-    ws.clearHandlers(sessionId);
-  };
+  return clearHandlers;
 };
 
 /** Leave chat session subscription (switch away). */

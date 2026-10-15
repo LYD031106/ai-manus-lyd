@@ -38,7 +38,7 @@
 
       <div class="flex shrink-0 items-center gap-[4px]">
         <!-- Use {product}'s computer — official button tokens -->
-        <div v-if="!isShare" class="relative" ref="useComputerRef">
+        <div v-if="!isShare && browserEnabled" class="relative" ref="useComputerRef">
           <button
             type="button"
             class="flex items-center justify-end gap-[1px] clickable px-[6px] py-1 hover:bg-[var(--fill-tsp-white-light)] rounded-md !size-[32px] justify-center !rounded-[8px] !p-0 text-[var(--icon-secondary)] [&_svg]:!size-[18px]"
@@ -88,7 +88,7 @@
           </div>
         </div>
 
-        <div v-if="!isShare" class="flex items-center px-[4px]">
+        <div v-if="!isShare && browserEnabled" class="flex items-center px-[4px]">
           <div class="h-[16px] w-px bg-[var(--border-dark)]" />
         </div>
 
@@ -224,6 +224,7 @@ import {
 } from 'lucide-vue-next';
 import type { ToolContent } from '@/types/message';
 import type { PlanEventData } from '@/types/event';
+import { useCapabilities } from '@/composables/useCapabilities';
 import { useToolInfo } from '@/composables/useTool';
 import PlanPanel from './PlanPanel.vue';
 import ComputerInactiveEmpty from './ComputerInactiveEmpty.vue';
@@ -247,6 +248,7 @@ const props = withDefaults(defineProps<{
 });
 
 const { t, locale } = useI18n();
+const { browserEnabled } = useCapabilities();
 const { toolInfo } = useToolInfo(toRef(props, 'toolContent'));
 const isMobile = useMediaQuery('(max-width: 767px)');
 
@@ -369,6 +371,7 @@ const jumpToRealTime = () => {
 };
 
 const confirmUseComputer = () => {
+  if (!browserEnabled.value) return;
   showUseComputer.value = false;
   emit('useComputer');
 };

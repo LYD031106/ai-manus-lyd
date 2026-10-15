@@ -107,6 +107,19 @@ class DockerSandbox(Sandbox):
                     "NO_PROXY": settings.sandbox_no_proxy
                 }
             }
+
+            # The lightweight image runs directly as its application user.
+            # The desktop image still needs supervisor user switching and sudo.
+            if not settings.browser_enabled:
+                container_config["security_opt"] = ["no-new-privileges:true"]
+                container_config["cap_drop"] = ["ALL"]
+
+            if settings.sandbox_mem_limit:
+                container_config["mem_limit"] = settings.sandbox_mem_limit
+            if settings.sandbox_nano_cpus:
+                container_config["nano_cpus"] = settings.sandbox_nano_cpus
+            if settings.sandbox_pids_limit:
+                container_config["pids_limit"] = settings.sandbox_pids_limit
             
             # Add network to container config if configured
             if settings.sandbox_network:
@@ -473,9 +486,9 @@ class DockerSandbox(Sandbox):
         try:
             if self.client:
                 await self.client.aclose()
-            if self.container_name:
+            if self._container_name:
                 docker_client = docker.from_env()
-                docker_client.containers.get(self.container_name).remove(force=True)
+                docker_client.containers.get(self._container_name).remove(force=True)
             return True
         except Exception as e:
             logger.error(f"Failed to destroy Docker sandbox: {str(e)}")

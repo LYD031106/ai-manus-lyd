@@ -264,6 +264,10 @@ class ChatWebSocket {
 
   setHandlers(sessionId: string, handlers: SessionHandlers) {
     this.handlers.set(sessionId, handlers);
+    // A late completion from an earlier subscription must not clear its replacement.
+    return () => {
+      if (this.handlers.get(sessionId) === handlers) this.handlers.delete(sessionId);
+    };
   }
 
   clearHandlers(sessionId: string) {

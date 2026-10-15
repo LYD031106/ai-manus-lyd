@@ -187,8 +187,7 @@
     <ComputerPanel ref="computerPanel" :sessionId="sessionId" :realTime="realTime"
       :isShare="false" :toolHistory="toolHistory" :plan="plan"
       @jumpToRealTime="jumpToRealTime"
-      @selectTool="handleSelectTool"
-      @useComputer="handleTakeControl" />
+      @selectTool="handleSelectTool" @useComputer="handleTakeControl" />
   </SimpleBar>
 </template>
 
@@ -206,16 +205,17 @@ import * as agentApi from '../api/agent';
 import { Message, MessageContent, ToolContent, StepContent, isConsecutiveAssistant } from '../types/message';
 import { PlanEventData, AgentEvent, type TerminalUpdateEventData, type FileUpdateEventData } from '../types/event';
 import { useAgentEvents } from '../composables/useAgentEvents';
+import { useCapabilities } from '../composables/useCapabilities';
 import { useSessionPhase } from '../composables/useSessionPhase';
 import ComputerPanel from '../components/ComputerPanel.vue'
-import { ArrowDown, FileSearch, Lock, Globe, Link, Check, Ellipsis, Pencil, Star, Trash, FolderPlus, Folder, FolderSync, Pin, ChevronDown } from 'lucide-vue-next';
+import { ArrowDown, FileSearch, Lock, Globe, Link, Check, Ellipsis, Pencil, Star, Trash, FolderPlus, Folder, FolderSync, Pin, ChevronDown, CircleHelp } from 'lucide-vue-next';
 import ShareIcon from '@/components/icons/ShareIcon.vue';
 import { showErrorToast, showSuccessToast } from '../utils/toast';
 import type { FileInfo } from '../api/file';
 import { useSessionFileList } from '../composables/useSessionFileList'
 import { useFilePreviewer } from '../composables/useFilePreviewer'
 import { copyToClipboard } from '../utils/dom'
-import { SessionStatus, type ProjectItem } from '../types/response';
+import { type ProjectItem } from '../types/response';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import LoadingIndicator from '@/components/ui/LoadingIndicator.vue';
 import { useContextMenu, createMenuItem, createDangerMenuItem, createSeparator, createSubmenuItem } from '../composables/useContextMenu';
@@ -223,6 +223,7 @@ import { useDialog } from '../composables/useDialog';
 import { getProjects, createProject } from '../api/project';
 import { eventBus } from '../utils/eventBus';
 
+const { browserEnabled } = useCapabilities();
 const router = useRouter()
 const { t } = useI18n()
 const { showSessionFileList } = useSessionFileList()
@@ -300,6 +301,9 @@ const modeMenuPanelRef = ref<HTMLElement | null>(null);
 const modeMenuPos = ref({ top: 0, left: 0 });
 const showModeMenu = ref(false);
 const { showContextMenu } = useContextMenu();
+const isRestoringSession = ref(false);
+let restoreGeneration = 0;
+let reportedError: { generation: number; content: string } | undefined;
 
 const toggleModeMenu = () => {
   if (!showModeMenu.value && modeMenuRef.value) {
@@ -328,7 +332,7 @@ const hasBrowserTool = computed(() =>
 
 /** Official suggest-takeover banner: waiting + browser tool available */
 const showTakeControlBanner = computed(() =>
-  phase.value === 'waiting' && !isBusy.value && hasBrowserTool.value,
+  browserEnabled.value && phase.value === 'waiting' && !isBusy.value && hasBrowserTool.value,
 );
 
 const chatPlaceholder = computed(() => t('Send message to Manus'));
@@ -399,7 +403,7 @@ const isAssistantLastBeforeUser = (index: number) => {
 };
 
 // Shared agent event -> message list conversion
-const { handleEvent: handleAgentEvent } = useAgentEvents(
+const { handleEvent: handleAgentEvent, replayEvents } = useAgentEvents(
   { messages, title, plan, lastEventId, lastTool, lastNoMessageTool },
   {
     onToolActivity: (tool: ToolContent) => {
@@ -417,6 +421,8 @@ const handleEvent = (event: AgentEvent) => {
 
 // Reset all refs to their initial values
 const resetState = () => {
+  restoreGeneration += 1;
+  isRestoringSession.value = false;
   const prevSessionId = sessionId.value;
   // Drop local stream handlers; leave WS subscription for previous session
   if (cancelCurrentChat.value) {
@@ -439,6 +445,9 @@ const resetState = () => {
 
 // Watch message changes and automatically scroll to bottom
 watch(messages, async () => {
+  // Restore history in one batch. Scrolling once after the batch avoids a
+  // nextTick/layout cycle for every historical event.
+  if (isRestoringSession.value) return;
   await nextTick();
   if (follow.value) {
     simpleBarRef.value?.scrollToBottom();
@@ -447,11 +456,12 @@ watch(messages, async () => {
 
 
 
-const chatStreamCallbacks = (): agentApi.ChatStreamCallbacks => ({
+const chatStreamCallbacks = (expectedSessionId: string, generation = restoreGeneration): agentApi.ChatStreamCallbacks => ({
   onOpen: () => {
     // Keep loading only when we already marked a turn in flight (chat send)
   },
   onMessage: ({ event, data }) => {
+    if (sessionId.value !== expectedSessionId || restoreGeneration !== generation) return;
     if (event === 'terminal_update') {
       const d = data as TerminalUpdateEventData;
       if (!sessionId.value) return;
@@ -480,20 +490,20 @@ const chatStreamCallbacks = (): agentApi.ChatStreamCallbacks => ({
     });
   },
   onStatusUpdate: (agentStatus) => {
+    if (sessionId.value !== expectedSessionId || restoreGeneration !== generation) return;
     applyStatusUpdate(agentStatus);
   },
   onClose: () => {
+    if (sessionId.value !== expectedSessionId || restoreGeneration !== generation) return;
     // Loading is driven by status_update (follows stream_end). Do not clear here.
     if (cancelCurrentChat.value) {
       cancelCurrentChat.value = null;
     }
   },
   onError: (error) => {
+    if (sessionId.value !== expectedSessionId || restoreGeneration !== generation) return;
     console.error('Chat error:', error);
-    noteDomainEvent('error');
-    if (cancelCurrentChat.value) {
-      cancelCurrentChat.value = null;
-    }
+    reportChatError(error);
   },
 });
 
@@ -501,8 +511,33 @@ const handleSubmit = () => {
   chat(inputMessage.value, attachments.value);
 }
 
+const reportChatError = (error: unknown) => {
+  const detail = error instanceof Error && error.message
+    ? error.message
+    : t('Unknown error');
+  const content = t('Chat request failed: {error}', { error: detail });
+  // A rejected WS request can arrive through both onError and its promise.
+  if (reportedError?.generation === restoreGeneration && reportedError.content === content) return;
+  reportedError = { generation: restoreGeneration, content };
+
+  messages.value.push({
+    type: 'assistant',
+    content: {
+      content,
+      timestamp: Math.floor(Date.now() / 1000)
+    } as MessageContent,
+  });
+  showErrorToast(content);
+  noteDomainEvent('error');
+  cancelCurrentChat.value = null;
+}
+
 const chat = async (message: string = '', files: FileInfo[] = []) => {
   if (!sessionId.value) return;
+  const requestedSessionId = sessionId.value;
+  const generation = ++restoreGeneration;
+  isRestoringSession.value = false;
+  const effectiveMessage = message.trim() || (files.length > 0 ? t('Process the attached files') : '');
 
   // Cancel any existing chat connection before starting a new one
   if (cancelCurrentChat.value) {
@@ -515,7 +550,7 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
     messages.value.push({
       type: 'user',
       content: {
-        content: message,
+        content: effectiveMessage,
         timestamp: Math.floor(Date.now() / 1000),
         attachments: files.length > 0 ? files : undefined,
       } as MessageContent,
@@ -531,79 +566,70 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
   noteOptimisticRun();
 
   try {
-    cancelCurrentChat.value = await agentApi.chatWithSession(
-      sessionId.value,
-      message,
+    const cancel = await agentApi.chatWithSession(
+      requestedSessionId,
+      effectiveMessage,
       lastEventId.value,
       files.map((file: FileInfo) => ({file_id : file.file_id, 
                                         filename : file.filename})),
       {
-        ...chatStreamCallbacks(),
+        ...chatStreamCallbacks(requestedSessionId, generation),
         onOpen: () => {
-          noteOptimisticRun();
+          if (sessionId.value === requestedSessionId && restoreGeneration === generation) noteOptimisticRun();
         },
       }
     );
+    if (sessionId.value === requestedSessionId && restoreGeneration === generation) cancelCurrentChat.value = cancel;
+    else cancel();
   } catch (error) {
+    if (sessionId.value !== requestedSessionId || restoreGeneration !== generation) return;
     console.error('Chat error:', error);
-    noteDomainEvent('error');
-    cancelCurrentChat.value = null;
+    reportChatError(error);
   }
 }
 
 const restoreSession = async () => {
-  if (!sessionId.value) {
+  const requestedSessionId = sessionId.value;
+  if (!requestedSessionId) {
     showErrorToast(t('Session not found'));
     return;
   }
-  const session = await agentApi.getSession(sessionId.value);
-  applySessionMeta(session);
-  realTime.value = false;
-  hydrateFromSessionStatus(session.status);
-  for (const event of session.events) {
-    handleAgentEvent(event);
-  }
-  realTime.value = true;
-
-  // Always join the chat channel (status_update + idle Mongo catch-up).
-  // Only resume the live Redis stream while the agent is running.
-  if (cancelCurrentChat.value) {
-    cancelCurrentChat.value();
-    cancelCurrentChat.value = null;
-  }
+  const generation = ++restoreGeneration;
+  const isCurrent = () => sessionId.value === requestedSessionId && restoreGeneration === generation;
+  isRestoringSession.value = true;
   try {
-    if (session.status === SessionStatus.RUNNING) {
-      noteOptimisticRun();
-      cancelCurrentChat.value = await agentApi.chatWithSession(
-        sessionId.value,
-        '',
-        lastEventId.value,
-        undefined,
-        {
-          ...chatStreamCallbacks(),
-          onOpen: () => {
-            noteOptimisticRun();
-          },
-        },
-      );
-    } else {
-      cancelCurrentChat.value = await agentApi.chatWithSession(
-        sessionId.value,
-        '',
-        lastEventId.value,
-        undefined,
-        chatStreamCallbacks(),
-      );
-    }
-  } catch (error) {
-    console.error('Failed to join chat session:', error);
-    noteDomainEvent('error');
+    const session = await agentApi.getSession(requestedSessionId);
+    if (!isCurrent()) return;
+    applySessionMeta(session);
+    realTime.value = false;
+    hydrateFromSessionStatus(session.status);
+    replayEvents(session.events);
+    realTime.value = true;
+    // Let the history watcher observe the batch while scrolling remains suspended.
+    await nextTick();
+    if (!isCurrent()) return;
+    isRestoringSession.value = false;
+    if (follow.value) simpleBarRef.value?.scrollToBottom();
+
+    // Keep main's status channel and idle catch-up, including completed sessions.
+    cancelCurrentChat.value?.();
     cancelCurrentChat.value = null;
+    const cancel = await agentApi.chatWithSession(
+      requestedSessionId, '', lastEventId.value, undefined,
+      chatStreamCallbacks(requestedSessionId, generation),
+    );
+    if (!isCurrent()) {
+      cancel();
+      return;
+    }
+    cancelCurrentChat.value = cancel;
+    void agentApi.clearUnreadMessageCount(requestedSessionId).catch(console.error);
+  } catch (error) {
+    if (isCurrent()) reportChatError(error);
+  } finally {
+    if (isCurrent()) isRestoringSession.value = false;
   }
-  agentApi.clearUnreadMessageCount(sessionId.value);
 }
-
-
 
 onBeforeRouteUpdate((to, _, next) => {
   computerPanel.value?.hideComputerPanel();
@@ -645,13 +671,17 @@ onMounted(() => {
     if (message || (files && files.length > 0)) {
       // Initial-message path used to skip restoreSession(), so taskMode never
       // left the default 'agent'. Load session meta first, then send.
+      const requestedSessionId = sessionId.value;
+      const generation = restoreGeneration;
       void (async () => {
         try {
-          const session = await agentApi.getSession(sessionId.value!);
+          const session = await agentApi.getSession(requestedSessionId);
+          if (sessionId.value !== requestedSessionId || restoreGeneration !== generation) return;
           applySessionMeta(session);
         } catch (e) {
           console.error('Failed to load session meta before initial chat', e);
         }
+        if (sessionId.value !== requestedSessionId || restoreGeneration !== generation) return;
         await chat(message || '', files || []);
       })();
     } else {
@@ -661,6 +691,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  restoreGeneration += 1;
   document.removeEventListener('mousedown', handleModeMenuOutside);
   window.removeEventListener('scroll', handleModeMenuScroll, true);
   const prevSessionId = sessionId.value;
@@ -793,7 +824,7 @@ const handleCopyLink = async () => {
 }
 
 const handleTakeControl = () => {
-  if (!sessionId.value) return;
+  if (!sessionId.value || !browserEnabled.value) return;
   // Prefer opening computer panel on latest browser tool, then enter takeover
   const browserTool = [...toolHistory.value].reverse().find((t) => t.name === 'browser');
   if (browserTool) {

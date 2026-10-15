@@ -3,7 +3,7 @@
     <div class="w-full h-full object-cover flex items-center justify-center bg-[var(--fill-white)] relative">
       <div class="w-full h-full min-h-0">
         <VNCViewer
-          v-if="props.live"
+          v-if="props.live && browserEnabled"
           :session-id="props.sessionId"
           :enabled="props.live"
           :view-only="true"
@@ -17,7 +17,7 @@
         >
       </div>
       <button
-        v-if="!isShare"
+        v-if="!isShare && browserEnabled"
         type="button"
         class="absolute right-[10px] bottom-[10px] z-10 min-w-10 h-10 flex items-center justify-center rounded-full bg-[var(--background-menu-white)] text-[var(--text-primary)] border border-[var(--border-main)] shadow-[0px_5px_16px_0px_var(--shadow-S),0px_0px_1.25px_0px_var(--shadow-S)] backdrop-blur-3xl cursor-pointer hover:bg-[var(--text-blue)] hover:px-4 hover:text-[var(--text-white)] group transition-[width] duration-300"
         @click="takeOver">
@@ -33,9 +33,11 @@
 
 <script setup lang="ts">
 import { ToolContent } from '@/types/message';
-import { ref, watch } from 'vue';
+import { ref, watch, defineAsyncComponent } from 'vue';
 import { useI18n } from 'vue-i18n';
-import VNCViewer from '@/components/VNCViewer.vue';
+import { useCapabilities } from '@/composables/useCapabilities';
+const VNCViewer = defineAsyncComponent(() => import('@/components/VNCViewer.vue'));
+const { browserEnabled } = useCapabilities();
 import TakeOverIcon from '@/components/icons/TakeOverIcon.vue';
 import { eventBus } from '@/utils/eventBus';
 
@@ -57,6 +59,7 @@ watch(() => props.toolContent?.content?.screenshot, () => {
 }, { immediate: true });
 
 const takeOver = () => {
+  if (!browserEnabled.value) return;
   eventBus.emit('ui:takeover', {
     sessionId: props.sessionId,
     active: true,

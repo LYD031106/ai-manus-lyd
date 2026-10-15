@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { getStoredToken } from '../api/auth'
 import { getCachedClientConfig } from '../api/config'
 
-// Pages are lazy-loaded so heavy dependencies (Monaco, NoVNC, Claw assets)
+// Pages are lazy-loaded so heavy dependencies (NoVNC, Claw assets)
 // stay out of the initial bundle.
 export const router = createRouter({
   history: createWebHistory(),
@@ -77,6 +77,11 @@ router.beforeEach(async (to, _, next) => {
   const hasToken = !!getStoredToken()
   const clientConfig = await getCachedClientConfig()
   const authProvider = clientConfig?.auth_provider ?? null
+
+  if (to.path === '/chat/claw' && !clientConfig?.claw_enabled) {
+    next('/chat')
+    return
+  }
 
   if (requiresAuth) {
     if (authProvider === 'none' || authProvider === null) {

@@ -67,13 +67,23 @@ class MessageStreamEvent(BaseStreamEvent):
     data: MessageEventData
 
     @classmethod
-    async def from_event_async(cls, event: MessageEvent) -> Self:
+    async def from_event_async(
+        cls,
+        event: MessageEvent,
+        include_file_urls: bool = True,
+    ) -> Self:
         return cls(
             data=MessageEventData(
                 **BaseEventData.base_event_data(event),
                 role=event.role,
                 content=event.message,
-                attachments=[await FileInfoResponse.from_domain(attachment) for attachment in event.attachments] if event.attachments else None
+                attachments=[
+                    await FileInfoResponse.from_domain(
+                        attachment,
+                        include_file_url=include_file_urls,
+                    )
+                    for attachment in event.attachments
+                ] if event.attachments else None
             )
         )
 
@@ -244,17 +254,30 @@ class EventMapper:
     """Map AgentEvent (domain) to AgentStreamEvent (WS / REST wire format)"""
 
     @staticmethod
-    async def event_to_stream_event(event: AgentEvent) -> AgentStreamEvent:
+    async def event_to_stream_event(
+        event: AgentEvent,
+        include_file_urls: bool = True,
+    ) -> AgentStreamEvent:
         stream_event_class = _EVENT_TYPE_TO_STREAM_CLASS.get(event.type, CommonStreamEvent)
         # Classes needing IO (e.g. signed URLs) define from_event_async
         from_event_async = getattr(stream_event_class, "from_event_async", None)
         if from_event_async is not None:
+            if stream_event_class is MessageStreamEvent:
+                return await from_event_async(event, include_file_urls=include_file_urls)
             return await from_event_async(event)
         return stream_event_class.from_event(event)
 
     @staticmethod
-    async def events_to_stream_events(events: List[AgentEvent]) -> List[AgentStreamEvent]:
-        """Create wire event list from domain event list"""
+    async def events_to_stream_events(
+        events: List[AgentEvent],
+        include_file_urls: bool = True,
+    ) -> List[AgentStreamEvent]:
+        """Create wire event list from domain event list."""
         return [
-            await EventMapper.event_to_stream_event(event) for event in events if event
+            await EventMapper.event_to_stream_event(
+                event,
+                include_file_urls=include_file_urls,
+            )
+            for event in events
+            if event
         ]

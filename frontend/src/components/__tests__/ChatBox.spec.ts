@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { computed, nextTick } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
@@ -14,8 +14,11 @@ vi.mock('../ChatBoxFiles.vue', () => ({
     name: 'ChatBoxFiles',
     props: ['attachments'],
     emits: ['update:attachments'],
-    setup(_: unknown, { expose }: { expose: (exposed: Record<string, unknown>) => void }) {
-      expose({ isAllUploaded: true, uploadFile: uploadFileMock })
+    setup(props: { attachments: Array<{ status?: string }> }, { expose }: { expose: (exposed: Record<string, unknown>) => void }) {
+      expose({
+        isAllUploaded: computed(() => props.attachments.every(file => !file.status || file.status === 'success')),
+        uploadFile: uploadFileMock,
+      })
       return {}
     },
     template: '<div data-testid="chatbox-files" />'
@@ -23,6 +26,35 @@ vi.mock('../ChatBoxFiles.vue', () => ({
 }))
 
 describe('ChatBox TipTap', () => {
+  it('allows uploaded attachments without text by default', async () => {
+    const wrapper = mount(ChatBox, {
+      props: { modelValue: '', rows: 1, isRunning: false, attachments: [{
+        file_id: 'file-1', filename: 'data.txt', content_type: 'text/plain', size: 5, upload_date: '',
+      }] },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+    const send = wrapper.get('[data-testid="chatbox-send"]')
+    expect(send.attributes('disabled')).toBeUndefined()
+    await send.trigger('click')
+    expect(wrapper.emitted('submit')).toHaveLength(1)
+    wrapper.unmount()
+  })
+
+  it.each(['uploading', 'failed'])('blocks sending text with a %s attachment', async status => {
+    const file = { file_id: 'file-1', filename: 'data.txt', content_type: 'text/plain', size: 5, upload_date: '', status }
+    const wrapper = mount(ChatBox, {
+      props: { modelValue: 'review this', rows: 1, isRunning: false, attachments: [file] },
+      global: { plugins: [i18n] },
+    })
+    await flushPromises()
+    const send = wrapper.get('[data-testid="chatbox-send"]')
+    expect(send.attributes('disabled')).toBeDefined()
+    await send.trigger('click')
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('emits update:modelValue from editor plain text', async () => {
     const wrapper = mount(ChatBox, {
       props: { modelValue: '', rows: 1, isRunning: false, attachments: [] },

@@ -179,6 +179,7 @@ export default {
   'Give Manus a task to work on...': 'Give Manus a task to work on...',
   'Assign a task or type / to see more': 'Assign a task or type / to see more',
   'Send message to Manus': 'Send message to Manus',
+  'Process the attached files': 'Process the attached files',
   'Add files and more': 'Add files and more',
   'Add local files': 'Add local files',
   'You can choose to take over the browser to complete the operation.': 'You can choose to take over the browser to complete the operation.',
@@ -428,8 +429,10 @@ export default {
   'Claw has stopped, please recreate to continue chatting.': 'Claw has stopped, please recreate to continue chatting.',
   'Delete and recreate': 'Delete and recreate',
   'An error occurred': 'An error occurred',
+  'Chat request failed: {error}': 'Chat request failed: {error}',
+  'Unknown error': 'Unknown error',
   'Creation failed, please try again later': 'Creation failed, please try again later',
   'Please check {count} attachment(s) I sent': 'Please check {count} attachment(s) I sent',
   'WebSocket not connected, please try again later': 'WebSocket not connected, please try again later',
   'Claw has expired, please recreate.': 'Claw has expired, please recreate.',
-} 
+}

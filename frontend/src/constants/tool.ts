@@ -101,7 +101,8 @@ export const TOOL_ICON_MAP: {[key: string]: any} = {
 import ShellToolView from '@/components/toolViews/ShellToolView.vue';
 import FileToolView from '@/components/toolViews/FileToolView.vue';
 import SearchToolView from '@/components/toolViews/SearchToolView.vue';
-import BrowserToolView from '@/components/toolViews/BrowserToolView.vue';
+import { defineAsyncComponent } from 'vue';
+const BrowserToolView = defineAsyncComponent(() => import('@/components/toolViews/BrowserToolView.vue'));
 import McpToolView from '@/components/toolViews/McpToolView.vue';
 
 /**

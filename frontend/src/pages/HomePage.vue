@@ -212,7 +212,7 @@ onUnmounted(() => {
 });
 
 const handleSubmit = async () => {
-  if (message.value.trim() && !isSubmitting.value) {
+  if ((message.value.trim() || attachments.value.length > 0) && !isSubmitting.value) {
     isSubmitting.value = true;
 
     try {

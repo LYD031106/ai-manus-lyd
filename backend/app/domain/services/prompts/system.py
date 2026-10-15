@@ -14,9 +14,37 @@ This replaces the previous monolithic hardcoded prompt, which shipped rules
 for tools that were not always available and could drift out of sync with the
 toolset.
 """
+import logging
+from pathlib import Path
 from typing import List, Optional
 
+from app.core.config import get_settings
 from app.domain.services.tools.base import BaseToolkit
+
+logger = logging.getLogger(__name__)
+
+BUILTIN_SKILL_PATH = Path("/app/builtin_skills/s127-gml/SKILL.md")
+
+
+def _load_builtin_skill() -> str:
+    try:
+        content = BUILTIN_SKILL_PATH.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        logger.warning("Built-in s127-gml skill could not be loaded: %s", exc)
+        return ""
+    if not content:
+        return ""
+    return (
+        '<builtin_skill name="s127-gml">\n'
+        "This skill is built into every conversation sandbox. Its runtime root is "
+        "`/opt/skills/s127-gml`. Resolve every relative path and every legacy "
+        "`.cursor/skills/s127-gml` path in the skill against that runtime root.\n\n"
+        f"{content}\n"
+        "</builtin_skill>"
+    )
+
+
+BUILTIN_SKILL_PROMPT = _load_builtin_skill()
 
 CORE_PROMPT = """
 You are Manus, a general-purpose AI agent created by the Manus team.
@@ -47,7 +75,18 @@ what you produce.
 - Code must be saved to a file before execution; never pipe code inline into
   interpreters.
 </operating_principles>
+""".strip()
 
+LIGHTWEIGHT_SANDBOX_ENVIRONMENT = """
+<sandbox_environment>
+- Lightweight Linux sandbox (linux/amd64)
+- User home and uploaded files are under `/home/ubuntu`
+- Python 3.11 is available for scripts and file processing
+- Browser, desktop/VNC, Node.js, and other heavyweight runtimes are not installed
+</sandbox_environment>
+""".strip()
+
+BROWSER_SANDBOX_ENVIRONMENT = """
 <sandbox_environment>
 - Ubuntu 22.04 (linux/amd64) with internet access
 - User: `ubuntu` with sudo privileges; home directory: /home/ubuntu
@@ -84,7 +123,13 @@ def build_system_prompt(
         project_instruction: Optional per-project guidance from
             ``Project.instruction``.
     """
-    sections = [CORE_PROMPT]
+    environment = (
+        BROWSER_SANDBOX_ENVIRONMENT if get_settings().browser_enabled
+        else LIGHTWEIGHT_SANDBOX_ENVIRONMENT
+    )
+    sections = [CORE_PROMPT, environment]
+    if BUILTIN_SKILL_PROMPT:
+        sections.append(BUILTIN_SKILL_PROMPT)
     for toolkit in toolkits or []:
         instructions = (toolkit.instructions or "").strip()
         if instructions:

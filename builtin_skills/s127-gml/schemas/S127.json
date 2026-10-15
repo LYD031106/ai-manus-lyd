@@ -1,0 +1,1858 @@
+{
+  "InformationType": {
+    "NauticalInformation": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "categoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "graphic": {
+        "pictorialRepresentation": {
+          "pictureCaption": "short description of the purpose of the image",
+          "sourceDate": "",
+          "pictureInformation": "a set of information to provide credits to picture creator,copyright owner etc."
+        },
+        "bearingInformation": {
+          "cardinalDirection": "",
+          "Distance": "A numeric measure of the spatial separation between two locations.",
+          "Information": {
+            "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+            "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+            "Headline": "Words set at the head of a passage or page to introduce or categorize",
+            "Language": "eng/zho",
+            "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+          },
+          "Orientation": "",
+          "sectorBearing": ""
+        }
+      },
+      "rxnCode": {
+        "categoryOfRxN": "",
+        "actionOrActivity": "",
+        "Headline": "Words set at the head of a passage or page to introduce or categorize"
+      }
+    },
+    "Regulations": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "categoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "graphic": {
+        "pictorialRepresentation": {
+          "pictureCaption": "short description of the purpose of the image",
+          "sourceDate": "",
+          "pictureInformation": "a set of information to provide credits to picture creator,copyright owner etc."
+        },
+        "bearingInformation": {
+          "cardinalDirection": "",
+          "Distance": "A numeric measure of the spatial separation between two locations.",
+          "Information": {
+            "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+            "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+            "Headline": "Words set at the head of a passage or page to introduce or categorize",
+            "Language": "eng/zho",
+            "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+          },
+          "Orientation": "",
+          "sectorBearing": ""
+        }
+      },
+      "rxnCode": {
+        "categoryOfRxN": "",
+        "actionOrActivity": "",
+        "Headline": "Words set at the head of a passage or page to introduce or categorize"
+      }
+    },
+    "Restrictions": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "categoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "graphic": {
+        "pictorialRepresentation": {
+          "pictureCaption": "short description of the purpose of the image",
+          "sourceDate": "",
+          "pictureInformation": "a set of information to provide credits to picture creator,copyright owner etc."
+        },
+        "bearingInformation": {
+          "cardinalDirection": "",
+          "Distance": "A numeric measure of the spatial separation between two locations.",
+          "Information": {
+            "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+            "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+            "Headline": "Words set at the head of a passage or page to introduce or categorize",
+            "Language": "eng/zho",
+            "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+          },
+          "Orientation": "",
+          "sectorBearing": ""
+        }
+      },
+      "rxnCode": {
+        "categoryOfRxN": "",
+        "actionOrActivity": "",
+        "Headline": "Words set at the head of a passage or page to introduce or categorize"
+      }
+    },
+    "Recommendations": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "categoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "graphic": {
+        "pictorialRepresentation": {
+          "pictureCaption": "short description of the purpose of the image",
+          "sourceDate": "",
+          "pictureInformation": "a set of information to provide credits to picture creator,copyright owner etc."
+        },
+        "bearingInformation": {
+          "cardinalDirection": "",
+          "Distance": "A numeric measure of the spatial separation between two locations.",
+          "Information": {
+            "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+            "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+            "Headline": "Words set at the head of a passage or page to introduce or categorize",
+            "Language": "eng/zho",
+            "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+          },
+          "Orientation": "",
+          "sectorBearing": ""
+        }
+      },
+      "rxnCode": {
+        "categoryOfRxN": "",
+        "actionOrActivity": "",
+        "Headline": "Words set at the head of a passage or page to introduce or categorize"
+      }
+    },
+    "Authority": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "categoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      }
+    },
+    "ShipReport": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "categoryOfShipReport": "Classification of ship reports based on IMO standard report formats.",
+      "IMOFormatForReporting": "Whether a report must be in an IMO standard format",
+      "NoticeTime": {
+        "noticeTimeHours": "The time duration prior to the time the service is needed, when notice must be provided to the service provider.",
+        "noticeTimeText": "Text string qualifying the notice time specified in NTCHRS. This may explain the time specification in NTCHRS (e.g., \"3 working days\" for a NTCHRS value of \"72\" where NTCTIM is supposed to be \"3 working days\") or consist of other language qualifying the time, e.g., \"On departure from last port\" or \"On passing reporting line XY\")",
+        "Operation": ""
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      }
+    },
+    "Applicability": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "inBallast": "Whether the vessel is in ballast.",
+      "categoryOfCargo": "Classification of the different types of cargo that a ship may be carrying.",
+      "categoryOfDangerousOrHazardousCargo": "",
+      "categoryOfVessel": "Classification of vessels by function or use",
+      "categoryOfVesselRegistry": "The locality of vessel registration or enrolment relative to the nationality of a port, territorial sea, administrative area, exclusive zone or other location.",
+      "logicalConnectives": "",
+      "thicknessOfIceCapability": "The thickness of ice that the ship can safely transit.",
+      "vesselPerformance": "A description of the required handling characteristics of a vessel including hull design, main and auxilliary machinery, cargo handling equipment, navigation equipment and manoeuvring behaviour.",
+      "Information": {
+        "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+        "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+        "Headline": "Words set at the head of a passage or page to introduce or categorize",
+        "Language": "eng/zho",
+        "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+      },
+      "vesselsMeasurements": {
+        "comparisonOperator": "",
+        "vesselsCharacteristics": "",
+        "vesselsCharacteristicsValue": "",
+        "vesselsCharacteristicsUnit": ""
+      }
+    },
+    "ContactDetails": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "callName": "The designated call name of a station, e.g. radio station, radar station, pilot.",
+      "callSign": "The designated call-sign of a radio station.",
+      "categoryOfCommPreff": "",
+      "communicationChannel": "A channel number assigned to a specific radio frequency, frequencies or frequency band.",
+      "contactInstructions": "supplemental instructions on how or when to contact the individual, organisation, or service",
+      "Language": "eng/zho",
+      "mMSICode": "The Maritime Mobile Service Identity (MMSI) Code is formed of a series of nine digits which are transmitted over the radio path in order to uniquely identify ship stations, ship earth stations, coast stations, coast earth stations, and group calls. These identities are formed in such a way that the identity or part thereof can be used by telephone and telex subscribers connected to the general telecommunications network principally to call ships automatically.",
+      "contactAddress": {
+        "deliveryPoint": "Details of where post can be delivered such as the apartment, name and/or number of a street, building or PO Box.",
+        "cityName": "The name of a town or city.",
+        "administrativeDivision": "Administrative division is a generic term for an administrative region within a country at a level below that of the sovereign state.",
+        "coutryName": "The name of a nation.",
+        "postalCode": "Known in various countries as a postcode, or ZIP code, the postal code is a series of letters and/or digits that identifies each postal delivery area."
+      },
+      "frequencyPair": {
+        "frequencyShoreStationTransmits": "The shore station transmitter frequency expressed in kHz to one decimal place. Units: kHZ, Resolution: 0.1, Format: XXXXXX.Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
+        "frequencyShoreStationReceives": "The shore station receiver frequency expressed in kHz to one decimal place. Units: kHz, Resolution: 0.1, Format: XXXXXX.Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
+        "contactInstruction": ""
+      },
+      "Information": {
+        "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+        "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+        "Headline": "Words set at the head of a passage or page to introduce or categorize",
+        "Language": "eng/zho",
+        "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+      },
+      "onlineResource": {
+        "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+        "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+        "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+        "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+        "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+        "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+        "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+      },
+      "Telecommunications": {
+        "categoryOfCommPref": "",
+        "contactInstructions": "instructions on how and when to contact an individual or organisation",
+        "telcomCarrier": "The name of provider or type of carrier for a telecommunications service",
+        "telecommunicationIdentifier": "Identifier used for contact by means of a telecommunications service, such as a telephone number",
+        "telecommunicationService": "Type of telecommunications service",
+        "scheduleByDayOfWeek": {
+          "categoryOfSchedule": "Describes the type of schedule, e.g., opening, closure, etc.",
+          "timeIntervalsByDayOfWeek": ""
+        }
+      },
+      "Radiocommunications": {
+        "categoryOfCommPref": "",
+        "categoryOfMaritimeBroadcast": "Classification of maritime broadcast based on the nature of information conveyed.",
+        "categoryOfRadioMethods": "Categories of radiocommunications based on frequency band and radio traffic method.",
+        "communicationChannel": "",
+        "contactInstructions": "supplemental instructions on how or when to contact the individual, organisation, or service",
+        "frequencyPair": {
+          "frequencyShoreStationTransmits": "The shore station transmitter frequency expressed in kHz to one decimal place. Units: kHZ, Resolution: 0.1, Format: XXXXXX.Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
+          "frequencyShoreStationReceives": "The shore station receiver frequency expressed in kHz to one decimal place. Units: kHz, Resolution: 0.1, Format: XXXXXX.Examples: 4379.1 kHz becomes 043791; 13162.8 kHz becomes 131628",
+          "contactInstruction": ""
+        },
+        "signalFrequency": "",
+        "transmissionContent": "Content of transmission. Remarks: Not to be used if CATMAB is populated",
+        "timeIntervalsByDayOfWeek": "Time intervals by days of the week."
+      }
+    },
+    "ServiceHours": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "scheduleByDayOfWeek": {
+        "categoryOfSchedule": "Describes the type of schedule, e.g., opening, closure, etc.",
+        "timeIntervalsByDayOfWeek": ""
+      },
+      "Information": {
+        "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+        "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+        "Headline": "Words set at the head of a passage or page to introduce or categorize",
+        "Language": "eng/zho",
+        "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+      }
+    },
+    "NonStandardWorkingDay": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "dateFixed": "The date when a festival or national holiday recurs on the same day each year in the Gregorian calendar.",
+      "dateVariable": "A day which is not fixed in the Gregorian calendar.",
+      "Information": {
+        "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+        "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+        "Headline": "Words set at the head of a passage or page to introduce or categorize",
+        "Language": "eng/zho",
+        "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+      }
+    }
+  },
+  "FeatureType": {
+    "RadioCallingInPoint": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "callSign": "The designated call-sign of a radio station",
+      "categoryOfCargo": "Classification of the different types of cargo that a ship may be carrying.",
+      "CategoryOfVessel": "Classification of vessels by function or use",
+      "communicationChannel": "",
+      "Status": "Definition required",
+      "trafficFlow": "Direction of vessels passing a reference point.",
+      "orientationValue": "",
+      "componentOf": "NIPWG did not discuss whether the same calling-in point feature could be associated to separate Ship reporting, Traffic control service, and LPS Area features. Tentatively, encode coincident calling point features for each.",
+      "Geometry": ""
+    },
+    "ShipReportingServiceArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "ServiceAccessProcedure": "A description of the procedure to access the marine service.",
+      "requirementsForMaintenanceOfListeningWatch": "Description of continuous listening watch requirements.",
+      "Geometry": ""
+    },
+    "WaterwayArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "siltationRate": "A description of the rate at which the depth in an area decreases.",
+      "Status": "Definition required",
+      "dynamicResource": "Whether dynamic water level information is available.Remarks: If the value of this attribute is TRUE, the source of dynamic water level information, if known, should be encoded in the textContent attribute.",
+      "Geometry": ""
+    },
+    "VesselTrafficServiceArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoryOfVesselTrafficService": "Classification of vessel traffic services based on the nature of the control or services provided",
+      "serviceAccessProcedure": "A description of the procedure to access the marine service.",
+      "requirementsForMaintenanceOfListeningWatch": "Description of continuous listening watch requirements.",
+      "geometry": ""
+    },
+    "RouteingMeasure": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoeryOfRouteingMeasure": "Classification of routeing measures by type.",
+      "categoryOfTrafficSeparationScheme": "International classification of traffic separation scheme",
+      "categoryOfNavigationLine": "Classification of route guidance given to vessels",
+      "Geometry": ""
+    },
+    "CautionArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "Condition": "The various conditions of buildings and other constructions.",
+      "Status": "Definition required",
+      "Geometry": ""
+    },
+    "ConcentrationOfShippingHazardArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoryOfConcentrationOfShippingHazardArea": "Classification of shipping hazards due to traffic volume or density.",
+      "Status": "Definition required",
+      "Geometry": ""
+    },
+    "SignalStationWarning": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoryOfSignalStationWarming": "Classification of station based on the warning service provided",
+      "communicationChannel": "",
+      "Status": "Definition required.",
+      "Geometry": ""
+    },
+    "RadarRange": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "communicationChannel": "",
+      "Status": "Definition required.",
+      "Geometry": ""
+    },
+    "SignalStationTraffic": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoryOfSignalStationTraffic": "Classification of station based on the traffic service provided",
+      "CommunicationChannel": "",
+      "Status": "Definition required",
+      "Geometry": ""
+    },
+    "IspsCodeSecurityLevel": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "ispsLevel": "Classification of ISPS security levels according to the ISPS Code.",
+      "Geometry": ""
+    },
+    "MilitaryPracticeArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoryOfMilitaryPracticeArea": "Classification of area by military use",
+      "Nationality": "",
+      "Restriction": "The official legal statute of each kind of restricted area.",
+      "Status": "Definition required",
+      "Geometry": ""
+    },
+    "PilotBoardingPlace": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "callSign": "The designated call-sign of a radio station.",
+      "categoryOfPilotBoardingPlace": "Classification of pilot boarding place by method used to board pilots",
+      "categoryOfPreference": "The selection of one location compared to others.",
+      "categoryOfVessel": "Classification of vessels by function or use",
+      "communicationChannel": "",
+      "Destination": "The place or general direction to which a vessel is going or directed.Remarks: In addition to a placename of a port, harbour area or terminal, the place could include generalities such as “The north-west”, or “upriver”.",
+      "pilotMovement": "Description of the pilot vessel. The pilot vessel is a small vessel used by a pilot to go to or from a vessel employing the pilot's services.",
+      "Status": "",
+      "Geometry": ""
+    },
+    "PilotageDistrict": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "communicationChannel": "",
+      "Geometry": ""
+    },
+    "UnderkeelClearanceAllowanceArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "underkeelAllowance": {
+        "underkeelAllowanceFixed": "A fixed allowance given by an authority, which is added to draught in order to maintain a minimum underkeel clearance.",
+        "nderkeelAllowanceVariableBeamBased": "A percentage value, given by an authority, which is applied to ship's beam in order to calculate underkeel allowance.",
+        "underkeelAllowanceVariableDraughtBased": "A percentage value, given by an authority, which is applied to ship's draught in order to calculate underkeel allowance."
+      },
+      "waterLevelTrend": "The tendency of water level to change in a particular direction.",
+      "Geometry": ""
+    },
+    "RestrictedAreaRegulatory": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoryOfRestrictedArea": "The official legal status of each kind of restricted area defines the kind of restriction(s), e.g., the restriction for a 'game preserve' may be 'entering prohibited', the restriction for an 'anchoring prohibition area' is 'anchoring prohibited'.",
+      "Restriction": "",
+      "Status": "",
+      "Geometry": ""
+    },
+    "RestrictedAreaNavigational": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoryOfRestrictedArea": "The official legal status of each kind of restricted area defines the kind of restriction(s), e.g., the restriction for a 'game preserve' may be 'entering prohibited', the restriction for an 'anchoring prohibition area' is 'anchoring prohibited'.",
+      "Restriction": "",
+      "Status": "",
+      "Geometry": ""
+    },
+    "LocalPortServiceArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "serviceAccessProcedure": "A description of the procedure to access the marine service.",
+      "requirementsForMaintenanceOfListeningWatch": "Description of continuous listening watch requirements.",
+      "Geometry": ""
+    },
+    "PiracyRiskArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "Restriction": "The official legal statute of each kind of restricted area",
+      "Status": "",
+      "Geometry": ""
+    },
+    "UnderkeelClearanceManagementArea": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "dynamicResource": "Whether a vessel must use a shore-based or other resource to obtain up-to-date information.",
+      "Geometry": ""
+    },
+    "PlaceOfRefuge": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "Status": "",
+      "communicationChannel": "",
+      "Geometry": ""
+    },
+    "PilotService": {
+      "FixedDateRange": {
+        "dateStart": "The start date or time of the interval.",
+        "dateEnd": "The end date or time of the interval."
+      },
+      "FeatureName": {
+        "displayName": "A statement expressing if a feature name is to be displayed in certain display settings or not. Indication: Boolean. A True value is an indication that the name is intended to be displayed. Remarks: Where it is allowable to encode multiple instances of feature name for a single feature instance, only one feature name instance can indicate that the name is to be displayed (display name set to True).",
+        "Language": "The method of human communication, either spoken or written, consisting of the use of words in a structured and conventional way. Remarks: The language is encoded by a character code following ISO 639-3",
+        "Name": "The individual name of a feature."
+      },
+      "SourceIndication": {
+        "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+        "CountryName": "发文机构的国家名称",
+        "ReportedDate": "文件来源日期",
+        "Source": "The publication, document, or reference work from which information comes or is acquired.",
+        "SourceType": "Type of source",
+        "FeatureName": {
+          "Language": "eng/zho",
+          "Name": "可使用海事常见缩略词"
+        }
+      },
+      "TextContent": {
+        "categoryOfText": "Classification of completeness of textual information in relation to the source.",
+        "Information": {
+          "fileLocator": "The string encodes the location of a fragment of text or other information in a support file.",
+          "fileReference": "The string encodes the file name of a single external text file that contains the text.",
+          "Headline": "Words set at the head of a passage or page to introduce or categorize",
+          "Language": "eng/zho",
+          "Text": "A non-formatted digital text string.The attribute should be used, for example, to hold the information that is shown on paper charts by short cautionary and explanatory notes. Therefore text populated in text must not exceed 300 characters.Text may be in English or in a national language defined by the attribute language."
+        },
+        "onlineResource": {
+          "Linkage": "location (address) for on-line access using a URL/URI address or similar addressing scheme. (Adapted from ISO 19115:2014.)",
+          "Protocol": "connection protocol to be used. Example: ftp, http get KVP, http POST, etc. (ISO 19115)",
+          "ApplicationProfile": "name of an application profile that can be used with the online resource (ISO 19115)",
+          "NameOfResource": "name of the online resource (ISO 19115, adapted)",
+          "OnlineResourceDescription": "detailed text description of what the online resource is/does (ISO 19115)",
+          "OnlineFunction": "code for function performed by the online resource (ISO 19115)",
+          "ProtocolRequest": "Request used to access the resource. Structure and content depend on the protocol and standard used by the online resource, such as Web Feature Service standard. (ISO 19115, adapted)"
+        },
+        "SourceIndication": {
+          "CategoryOfAuthority": "The type of person, government agency or organisation granted powers of managing or controlling access to and/or activity in an area",
+          "CountryName": "The name of a nation. (Adapted from The American Heritage Dictionaries)",
+          "ReportedDate": "文件来源日期",
+          "Source": "The publication, document, or reference work from which information comes or is acquired.",
+          "SourceType": "Type of source",
+          "FeatureName": {
+            "Language": "eng/zho",
+            "Name": ""
+          }
+        }
+      },
+      "categoryOfPilot": "Classification of pilots and pilot services by type of waterway where piloting services are provided.",
+      "pilotQualification": "Classification of pilots and pilot services by type of license qualification or type of organization providing services.",
+      "pilotRequest": "Description of the pilot request procedure.",
+      "remotePilot": "Definition: Whether remote pilot services are available. True: remote pilot is available: Pilotage is available remotely from shore or other location remote from the vessel requiring pilotage. False: remote pilot is not available: Remote pilotage is not available.",
+      "noticeTime": {
+        "noticeTimeHours": "The time duration prior to the time the service is needed, when notice must be provided to the service provider.",
+        "noticeTimeText": "Text string qualifying the notice time specified in NTCHRS. This may explain the time specification in NTCHRS (e.g., \"3 working days\" for a NTCHRS value of \"72\" where NTCTIM is supposed to be \"3 working days\") or consist of other language qualifying the time, e.g., \"On departure from last port\" or \"On passing reporting line XY\")."
+      },
+      "Geometry": ""
+    }
+  }
+}

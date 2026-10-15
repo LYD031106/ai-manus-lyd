@@ -31,6 +31,7 @@ from app.domain.services.tools.browser import BrowserToolkit
 from app.domain.services.tools.file import FileToolkit
 from app.domain.services.tools.message import MessageToolkit
 from app.domain.services.tools.search import SearchToolkit
+from app.domain.services.tools.parse_regulation import ParseRegulationToolkit
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class PlanActFlow(BaseFlow):
         session_id: str,
         session_repository: SessionRepository,
         sandbox: Sandbox,
-        browser: Browser,
+        browser: Optional[Browser],
         mcp_tool: MCPToolkit,
         llm: LLM,
         search_engine: Optional[SearchEngine] = None,
@@ -67,11 +68,14 @@ class PlanActFlow(BaseFlow):
 
         tools = [
             ShellToolkit(sandbox),
-            BrowserToolkit(browser),
             FileToolkit(sandbox),
+            ParseRegulationToolkit(sandbox),
             MessageToolkit(),
             mcp_tool
         ]
+
+        if browser is not None:
+            tools.insert(1, BrowserToolkit(browser))
         
         # Only add search tool when search_engine is not None
         if search_engine:

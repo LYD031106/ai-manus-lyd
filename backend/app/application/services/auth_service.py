@@ -50,7 +50,6 @@ class AuthService:
             return False
         try:
             generated_hash = self._hash_password(password)
-            logger.info(f"Generated hash: {generated_hash} vs expected hash: {password_hash}")
             return generated_hash == password_hash
         except Exception as e:
             logger.error(f"Password verification error: {e}")
@@ -100,11 +99,6 @@ class AuthService:
         return session
 
     async def _user_from_id(self, user_id: str) -> Optional[User]:
-        if self.settings.auth_provider == "password":
-            user = await self.user_repository.get_user_by_id(user_id)
-            if not user or not user.is_active:
-                return None
-            return user
         if self.settings.auth_provider == "local" and user_id == "local_admin":
             return User(
                 id="local_admin",
@@ -113,6 +107,11 @@ class AuthService:
                 role=UserRole.ADMIN,
                 is_active=True,
             )
+        if self.settings.auth_provider in ("password", "local"):
+            user = await self.user_repository.get_user_by_id(user_id)
+            if not user or not user.is_active:
+                return None
+            return user
         return None
 
     async def resolve_session_token(self, token: str) -> Optional[ResolvedCredentials]:
@@ -170,7 +169,7 @@ class AuthService:
 
     async def user_from_resolved(self, resolved: ResolvedCredentials) -> Optional[User]:
         if resolved.source == CredentialSource.JWT_GRACE and resolved.jwt_payload:
-            if self.settings.auth_provider == "password":
+            if self.settings.auth_provider in ("password", "local"):
                 return await self._user_from_id(resolved.user_id)
             return User(
                 id=resolved.jwt_payload.get("sub"),
@@ -186,7 +185,7 @@ class AuthService:
     ) -> User:
         logger.info(f"Registering user: {email}")
 
-        if self.settings.auth_provider != "password":
+        if self.settings.auth_provider not in ("password", "local"):
             raise BadRequestError("Registration is not allowed")
 
         if not fullname or len(fullname.strip()) < 2:
@@ -225,7 +224,9 @@ class AuthService:
                 is_active=True,
             )
 
-        if self.settings.auth_provider == "local":
+        elif self.settings.auth_provider == "local":
+            # Keep the configured local administrator while also allowing
+            # database-backed accounts created through self-registration.
             if (
                 email == self.settings.local_auth_email
                 and password == self.settings.local_auth_password
@@ -237,10 +238,22 @@ class AuthService:
                     role=UserRole.ADMIN,
                     is_active=True,
                 )
-            logger.warning(f"Local authentication failed for user: {email}")
-            return None
 
-        if self.settings.auth_provider == "password":
+            user = await self.user_repository.get_user_by_email(email)
+            if not user or not user.is_active or not user.password_hash:
+                logger.warning(f"Local/database authentication failed for user: {email}")
+                return None
+            if not self._verify_password(password, user.password_hash):
+                logger.warning(f"Invalid password for registered user: {email}")
+                return None
+
+            user.update_last_login()
+            await self.user_repository.update_user(user)
+            logger.info(f"Registered user authenticated successfully: {email}")
+            return user
+
+        elif self.settings.auth_provider == "password":
+            # Database password authentication
             user = await self.user_repository.get_user_by_email(email)
             if not user:
                 logger.warning(f"User not found: {email}")
@@ -334,9 +347,9 @@ class AuthService:
             raise UnauthorizedError("Invalid refresh token")
 
         user_id = payload.get("sub")
-        user = await self.user_repository.get_user_by_id(user_id) if user_id else None
+        user = await self._user_from_id(user_id) if user_id else None
         if not user or not user.is_active:
-            if self.settings.auth_provider != "password" and user_id:
+            if self.settings.auth_provider not in ("password", "local") and user_id:
                 user = User(
                     id=user_id,
                     fullname=payload.get("fullname") or "user",

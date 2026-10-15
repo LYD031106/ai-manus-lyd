@@ -60,8 +60,14 @@ class Settings(BaseSettings):
     sandbox_https_proxy: str | None = None
     sandbox_http_proxy: str | None = None
     sandbox_no_proxy: str | None = None
+    # Lightweight deployments set explicit budgets; browser deployments retain
+    # their existing container defaults when these options are omitted.
+    sandbox_mem_limit: str | None = None
+    sandbox_nano_cpus: int | None = None
+    sandbox_pids_limit: int | None = None
 
     # Browser engine configuration
+    browser_enabled: bool = True
     browser_engine: str = "browser_use"  # "playwright" or "browser_use"
     
     # Search engine configuration
@@ -142,6 +148,14 @@ class Settings(BaseSettings):
     # Defaults to the Redis settings above when unset.
     # e.g. "redis://:password@redis:6379/0" or "amqp://user:pass@rabbitmq:5672//"
     celery_broker_url: str | None = None
+
+    # 法规图件文字识别配置（parse_regulation）
+    # 走阿里云百炼的 OpenAI 兼容接口，只用图片通道（base64 直传，无需 OSS）
+    # 用 OCR 模型而非通用 VL：通用模型会改写原文，法规条文不能被改写
+    parse_api_key: str | None = None       # 百炼 API Key；未设置时回退到 api_key
+    parse_api_base: str | None = None      # 默认 dashscope compatible-mode 端点
+    parse_model: str = "qwen-vl-ocr"
+    parse_max_tokens: int = 4096           # qwen-vl-ocr 的上限就是 4096
 
     # MCP configuration
     mcp_config_path: str = "/etc/mcp.json"

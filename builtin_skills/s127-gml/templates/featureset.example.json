@@ -1,0 +1,552 @@
+{
+  "$comment": "示例：平潭海域船舶避险推荐水域（对照 示例/避险区域/平潭海域船舶避险推荐水域/127CN00PTWRVEW001.gml）",
+  "dataset": {
+    "name": "127CN00PTWRVEW001",
+    "referenceDate": "2025-12-26",
+    "updateNumber": 0,
+    "agency": "CN",
+    "featureIdStart": 868
+  },
+  "common": {
+    "sourceIndication": {
+      "categoryOfAuthority": "maritime",
+      "countryName": "China",
+      "reportedDate": "2025-07-23",
+      "source": [
+        "Fujian Navigational Notice No.0438/2025",
+        "闽航通〔2025〕0438号"
+      ],
+      "sourceType": "official publication",
+      "featureName": {
+        "eng": "PINGTAN MSA",
+        "zho": "平潭海事局"
+      }
+    }
+  },
+  "geometries": {
+    "g-por1": {
+      "type": "surface",
+      "exterior": [
+        [
+          25.5915,
+          119.6846667
+        ],
+        [
+          25.5905,
+          119.6896667
+        ],
+        [
+          25.588,
+          119.6886667
+        ],
+        [
+          25.5883333,
+          119.6855
+        ],
+        [
+          25.5915,
+          119.6846667
+        ]
+      ]
+    },
+    "g-por2": {
+      "type": "surface",
+      "exterior": [
+        [
+          25.5181667,
+          119.7241667
+        ],
+        [
+          25.5161667,
+          119.7241667
+        ],
+        [
+          25.5163333,
+          119.7263333
+        ],
+        [
+          25.5161667,
+          119.7285
+        ],
+        [
+          25.5153333,
+          119.7295
+        ],
+        [
+          25.5143333,
+          119.7303333
+        ],
+        [
+          25.512,
+          119.732
+        ],
+        [
+          25.5126667,
+          119.7351667
+        ],
+        [
+          25.5153333,
+          119.735
+        ],
+        [
+          25.5166667,
+          119.7345
+        ],
+        [
+          25.5171667,
+          119.731
+        ],
+        [
+          25.5166667,
+          119.7308333
+        ],
+        [
+          25.5173333,
+          119.729
+        ],
+        [
+          25.5176667,
+          119.7253333
+        ],
+        [
+          25.5181667,
+          119.7241667
+        ]
+      ]
+    },
+    "g-por3": {
+      "type": "surface",
+      "exterior": [
+        [
+          25.4478333,
+          119.6963333
+        ],
+        [
+          25.4461667,
+          119.7
+        ],
+        [
+          25.4506667,
+          119.703
+        ],
+        [
+          25.4523333,
+          119.7001667
+        ],
+        [
+          25.4478333,
+          119.6963333
+        ]
+      ]
+    },
+    "g-por4": {
+      "type": "surface",
+      "exterior": [
+        [
+          25.5808333,
+          119.6976667
+        ],
+        [
+          25.5766667,
+          119.6961667
+        ],
+        [
+          25.5766667,
+          119.6985
+        ],
+        [
+          25.5801667,
+          119.6996667
+        ],
+        [
+          25.5808333,
+          119.6976667
+        ]
+      ]
+    },
+    "g-por5": {
+      "type": "surface",
+      "exterior": [
+        [
+          25.5141667,
+          119.725
+        ],
+        [
+          25.5131667,
+          119.7243333
+        ],
+        [
+          25.5125,
+          119.7246667
+        ],
+        [
+          25.5121667,
+          119.7246667
+        ],
+        [
+          25.5113333,
+          119.7251667
+        ],
+        [
+          25.5113333,
+          119.7256667
+        ],
+        [
+          25.511,
+          119.726
+        ],
+        [
+          25.5116667,
+          119.727
+        ],
+        [
+          25.5111667,
+          119.7288333
+        ],
+        [
+          25.5125,
+          119.7291667
+        ],
+        [
+          25.513,
+          119.728
+        ],
+        [
+          25.5141667,
+          119.725
+        ]
+      ]
+    },
+    "g-por6": {
+      "type": "surface",
+      "exterior": [
+        [
+          25.6183333,
+          119.6983333
+        ],
+        [
+          25.6148333,
+          119.7045
+        ],
+        [
+          25.6143333,
+          119.7041667
+        ],
+        [
+          25.6155,
+          119.7021667
+        ],
+        [
+          25.6146667,
+          119.7013333
+        ],
+        [
+          25.615,
+          119.6975
+        ],
+        [
+          25.614,
+          119.696
+        ],
+        [
+          25.6145,
+          119.695
+        ],
+        [
+          25.6183333,
+          119.6983333
+        ]
+      ]
+    }
+  },
+  "features": [
+    {
+      "ref": "auth-pingtan",
+      "type": "Authority",
+      "reusable": true,
+      "featureName": {
+        "eng": "PINGTAN MSA",
+        "zho": "平潭海事局"
+      },
+      "attributes": {
+        "categoryOfAuthority": "maritime"
+      }
+    },
+    {
+      "ref": "por1",
+      "type": "PlaceOfRefuge",
+      "featureName": {
+        "eng": "Recommended Vessel Evasion Waters North of Kan'ao Shipyard",
+        "zho": "看澳船厂北侧船舶避险推荐水域"
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "headline": {
+                "eng": "Berthing Requirements",
+                "zho": "停泊要求"
+              },
+              "text": {
+                "eng": "(1) Berthing Arrangements: vessels at berth shall make reasonable use of the designated evasion area waters, adopting side-by-side mooring with secure fastening measures to cope with adverse sea conditions, while using ship anchors to stabilise the hull after beaching.\r(2) Crew Safety Measures: except during Level 2 or higher typhoon emergency responses, or when the competent authority requires all personnel to evacuate, vessels shall arrange crew members to implement safety measures including fire prevention and anchor watch.\r(3) Communication Equipment: vessels shall keep VHF and other equipment in working order to ensure uninterrupted communication with the competent authority.\r(4) Pollution Prevention: while berthed, vessels shall take effective measures to prevent ship-source pollution, and shall not discharge oil, garbage or domestic sewage into the waters.\r(5) Dangerous Goods Vessels: dangerous goods carriers are not permitted to anchor within the recommended waters of Pingtan jurisdiction; where temporary anchorage is required in special circumstances, advance reporting to Pingtan MSA is mandatory.",
+                "zho": "（一）停泊船舶应合理利用避险区的水域，采取并靠加上安全的系固措施以应对恶劣海况，同时冲滩后使用船锚固定船体；\r（二）除二级及以上防台应急响应或主管单位要求需将人员全部撤离之外，平时船舶需安排船员落实防火、防走锚等安全保障措施；\r（三）船舶应保持甚高频等设备正常工作，确保与主管单位的通讯畅通，以便及时接收和传达相关信息和指令；\r（四）船舶在停泊期间应采取有效措施防止船舶污染，禁止向水域排放油类、垃圾、生活污水等污染物，保护海洋环境；\r（五）危险品运输船舶不允许在平潭辖区推荐水域锚泊，因特殊情况需要临时锚泊的，应提前向平潭海事局报告。"
+              }
+            },
+            {
+              "headline": {
+                "eng": "Precautions",
+                "zho": "注意事项"
+              },
+              "text": {
+                "eng": "The six recommended evasion zones offer favourable shelter and good seabed quality. As temporary anchorages for weather evasion they are not mandatory; vessels shall choose a zone according to their own dimensions, draught and actual safety conditions, and avoid collision with other vessels.",
+                "zho": "推荐的6个避险区掩护条件较好、底质良好，作为临时性锚泊避风水域，不具有强制性，船舶应根据自身尺度、吃水等实际安全情况合理选择，防止与海上船舶、设施发生碰撞。"
+              }
+            }
+          ]
+        }
+      ],
+      "attributes": {
+        "status": "recommended"
+      },
+      "geometry": "g-por1",
+      "associations": [
+        {
+          "role": "controlAuthority",
+          "target": "auth-pingtan",
+          "source": "闽航通〔2025〕0438号"
+        }
+      ]
+    },
+    {
+      "ref": "por2",
+      "type": "PlaceOfRefuge",
+      "featureName": {
+        "eng": "Recommended Vessel Evasion Waters South of Standard Sand Field in Zhuyu Lake",
+        "zho": "竹屿湖内标准沙场南侧船舶避险推荐水域"
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "headline": {
+                "eng": "Berthing Requirements",
+                "zho": "停泊要求"
+              },
+              "text": {
+                "eng": "(1) Berthing Arrangements: vessels at berth shall make reasonable use of the designated evasion area waters, adopting side-by-side mooring with secure fastening measures to cope with adverse sea conditions, while using ship anchors to stabilise the hull after beaching.\r(2) Crew Safety Measures: except during Level 2 or higher typhoon emergency responses, or when the competent authority requires all personnel to evacuate, vessels shall arrange crew members to implement safety measures including fire prevention and anchor watch.\r(3) Communication Equipment: vessels shall keep VHF and other equipment in working order to ensure uninterrupted communication with the competent authority.\r(4) Pollution Prevention: while berthed, vessels shall take effective measures to prevent ship-source pollution, and shall not discharge oil, garbage or domestic sewage into the waters.\r(5) Dangerous Goods Vessels: dangerous goods carriers are not permitted to anchor within the recommended waters of Pingtan jurisdiction; where temporary anchorage is required in special circumstances, advance reporting to Pingtan MSA is mandatory.",
+                "zho": "（一）停泊船舶应合理利用避险区的水域，采取并靠加上安全的系固措施以应对恶劣海况，同时冲滩后使用船锚固定船体；\r（二）除二级及以上防台应急响应或主管单位要求需将人员全部撤离之外，平时船舶需安排船员落实防火、防走锚等安全保障措施；\r（三）船舶应保持甚高频等设备正常工作，确保与主管单位的通讯畅通，以便及时接收和传达相关信息和指令；\r（四）船舶在停泊期间应采取有效措施防止船舶污染，禁止向水域排放油类、垃圾、生活污水等污染物，保护海洋环境；\r（五）危险品运输船舶不允许在平潭辖区推荐水域锚泊，因特殊情况需要临时锚泊的，应提前向平潭海事局报告。"
+              }
+            },
+            {
+              "headline": {
+                "eng": "Precautions",
+                "zho": "注意事项"
+              },
+              "text": {
+                "eng": "The six recommended evasion zones offer favourable shelter and good seabed quality. As temporary anchorages for weather evasion they are not mandatory; vessels shall choose a zone according to their own dimensions, draught and actual safety conditions, and avoid collision with other vessels.",
+                "zho": "推荐的6个避险区掩护条件较好、底质良好，作为临时性锚泊避风水域，不具有强制性，船舶应根据自身尺度、吃水等实际安全情况合理选择，防止与海上船舶、设施发生碰撞。"
+              }
+            }
+          ]
+        }
+      ],
+      "attributes": {
+        "status": "recommended"
+      },
+      "geometry": "g-por2",
+      "associations": [
+        {
+          "role": "controlAuthority",
+          "target": "auth-pingtan",
+          "source": "闽航通〔2025〕0438号"
+        }
+      ]
+    },
+    {
+      "ref": "por3",
+      "type": "PlaceOfRefuge",
+      "featureName": {
+        "eng": "Recommended Vessel Evasion Waters in Xiangbi Bay East of Jinjing Wharf",
+        "zho": "金井码头东侧象鼻湾内船舶避险推荐水域"
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "headline": {
+                "eng": "Berthing Requirements",
+                "zho": "停泊要求"
+              },
+              "text": {
+                "eng": "(1) Berthing Arrangements: vessels at berth shall make reasonable use of the designated evasion area waters, adopting side-by-side mooring with secure fastening measures to cope with adverse sea conditions, while using ship anchors to stabilise the hull after beaching.\r(2) Crew Safety Measures: except during Level 2 or higher typhoon emergency responses, or when the competent authority requires all personnel to evacuate, vessels shall arrange crew members to implement safety measures including fire prevention and anchor watch.\r(3) Communication Equipment: vessels shall keep VHF and other equipment in working order to ensure uninterrupted communication with the competent authority.\r(4) Pollution Prevention: while berthed, vessels shall take effective measures to prevent ship-source pollution, and shall not discharge oil, garbage or domestic sewage into the waters.\r(5) Dangerous Goods Vessels: dangerous goods carriers are not permitted to anchor within the recommended waters of Pingtan jurisdiction; where temporary anchorage is required in special circumstances, advance reporting to Pingtan MSA is mandatory.",
+                "zho": "（一）停泊船舶应合理利用避险区的水域，采取并靠加上安全的系固措施以应对恶劣海况，同时冲滩后使用船锚固定船体；\r（二）除二级及以上防台应急响应或主管单位要求需将人员全部撤离之外，平时船舶需安排船员落实防火、防走锚等安全保障措施；\r（三）船舶应保持甚高频等设备正常工作，确保与主管单位的通讯畅通，以便及时接收和传达相关信息和指令；\r（四）船舶在停泊期间应采取有效措施防止船舶污染，禁止向水域排放油类、垃圾、生活污水等污染物，保护海洋环境；\r（五）危险品运输船舶不允许在平潭辖区推荐水域锚泊，因特殊情况需要临时锚泊的，应提前向平潭海事局报告。"
+              }
+            },
+            {
+              "headline": {
+                "eng": "Precautions",
+                "zho": "注意事项"
+              },
+              "text": {
+                "eng": "The six recommended evasion zones offer favourable shelter and good seabed quality. As temporary anchorages for weather evasion they are not mandatory; vessels shall choose a zone according to their own dimensions, draught and actual safety conditions, and avoid collision with other vessels.",
+                "zho": "推荐的6个避险区掩护条件较好、底质良好，作为临时性锚泊避风水域，不具有强制性，船舶应根据自身尺度、吃水等实际安全情况合理选择，防止与海上船舶、设施发生碰撞。"
+              }
+            }
+          ]
+        }
+      ],
+      "attributes": {
+        "status": "recommended"
+      },
+      "geometry": "g-por3",
+      "associations": [
+        {
+          "role": "controlAuthority",
+          "target": "auth-pingtan",
+          "source": "闽航通〔2025〕0438号"
+        }
+      ]
+    },
+    {
+      "ref": "por4",
+      "type": "PlaceOfRefuge",
+      "featureName": {
+        "eng": "Recommended Vessel Evasion Waters East of Kan'ao Shipyard",
+        "zho": "看澳船厂东侧船舶避险推荐水域"
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "headline": {
+                "eng": "Berthing Requirements",
+                "zho": "停泊要求"
+              },
+              "text": {
+                "eng": "(1) Berthing Arrangements: vessels at berth shall make reasonable use of the designated evasion area waters, adopting side-by-side mooring with secure fastening measures to cope with adverse sea conditions, while using ship anchors to stabilise the hull after beaching.\r(2) Crew Safety Measures: except during Level 2 or higher typhoon emergency responses, or when the competent authority requires all personnel to evacuate, vessels shall arrange crew members to implement safety measures including fire prevention and anchor watch.\r(3) Communication Equipment: vessels shall keep VHF and other equipment in working order to ensure uninterrupted communication with the competent authority.\r(4) Pollution Prevention: while berthed, vessels shall take effective measures to prevent ship-source pollution, and shall not discharge oil, garbage or domestic sewage into the waters.\r(5) Dangerous Goods Vessels: dangerous goods carriers are not permitted to anchor within the recommended waters of Pingtan jurisdiction; where temporary anchorage is required in special circumstances, advance reporting to Pingtan MSA is mandatory.",
+                "zho": "（一）停泊船舶应合理利用避险区的水域，采取并靠加上安全的系固措施以应对恶劣海况，同时冲滩后使用船锚固定船体；\r（二）除二级及以上防台应急响应或主管单位要求需将人员全部撤离之外，平时船舶需安排船员落实防火、防走锚等安全保障措施；\r（三）船舶应保持甚高频等设备正常工作，确保与主管单位的通讯畅通，以便及时接收和传达相关信息和指令；\r（四）船舶在停泊期间应采取有效措施防止船舶污染，禁止向水域排放油类、垃圾、生活污水等污染物，保护海洋环境；\r（五）危险品运输船舶不允许在平潭辖区推荐水域锚泊，因特殊情况需要临时锚泊的，应提前向平潭海事局报告。"
+              }
+            },
+            {
+              "headline": {
+                "eng": "Precautions",
+                "zho": "注意事项"
+              },
+              "text": {
+                "eng": "The six recommended evasion zones offer favourable shelter and good seabed quality. As temporary anchorages for weather evasion they are not mandatory; vessels shall choose a zone according to their own dimensions, draught and actual safety conditions, and avoid collision with other vessels.",
+                "zho": "推荐的6个避险区掩护条件较好、底质良好，作为临时性锚泊避风水域，不具有强制性，船舶应根据自身尺度、吃水等实际安全情况合理选择，防止与海上船舶、设施发生碰撞。"
+              }
+            }
+          ]
+        }
+      ],
+      "attributes": {
+        "status": "recommended"
+      },
+      "geometry": "g-por4",
+      "associations": [
+        {
+          "role": "controlAuthority",
+          "target": "auth-pingtan",
+          "source": "闽航通〔2025〕0438号"
+        }
+      ]
+    },
+    {
+      "ref": "por5",
+      "type": "PlaceOfRefuge",
+      "featureName": {
+        "eng": "Recommended Vessel Evasion Waters West of Standard Sand Field in Zhuyu Lake",
+        "zho": "竹屿湖内海军码头西侧船舶避险推荐水域"
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "headline": {
+                "eng": "Berthing Requirements",
+                "zho": "停泊要求"
+              },
+              "text": {
+                "eng": "(1) Berthing Arrangements: vessels at berth shall make reasonable use of the designated evasion area waters, adopting side-by-side mooring with secure fastening measures to cope with adverse sea conditions, while using ship anchors to stabilise the hull after beaching.\r(2) Crew Safety Measures: except during Level 2 or higher typhoon emergency responses, or when the competent authority requires all personnel to evacuate, vessels shall arrange crew members to implement safety measures including fire prevention and anchor watch.\r(3) Communication Equipment: vessels shall keep VHF and other equipment in working order to ensure uninterrupted communication with the competent authority.\r(4) Pollution Prevention: while berthed, vessels shall take effective measures to prevent ship-source pollution, and shall not discharge oil, garbage or domestic sewage into the waters.\r(5) Dangerous Goods Vessels: dangerous goods carriers are not permitted to anchor within the recommended waters of Pingtan jurisdiction; where temporary anchorage is required in special circumstances, advance reporting to Pingtan MSA is mandatory.",
+                "zho": "（一）停泊船舶应合理利用避险区的水域，采取并靠加上安全的系固措施以应对恶劣海况，同时冲滩后使用船锚固定船体；\r（二）除二级及以上防台应急响应或主管单位要求需将人员全部撤离之外，平时船舶需安排船员落实防火、防走锚等安全保障措施；\r（三）船舶应保持甚高频等设备正常工作，确保与主管单位的通讯畅通，以便及时接收和传达相关信息和指令；\r（四）船舶在停泊期间应采取有效措施防止船舶污染，禁止向水域排放油类、垃圾、生活污水等污染物，保护海洋环境；\r（五）危险品运输船舶不允许在平潭辖区推荐水域锚泊，因特殊情况需要临时锚泊的，应提前向平潭海事局报告。"
+              }
+            },
+            {
+              "headline": {
+                "eng": "Precautions",
+                "zho": "注意事项"
+              },
+              "text": {
+                "eng": "The six recommended evasion zones offer favourable shelter and good seabed quality. As temporary anchorages for weather evasion they are not mandatory; vessels shall choose a zone according to their own dimensions, draught and actual safety conditions, and avoid collision with other vessels.",
+                "zho": "推荐的6个避险区掩护条件较好、底质良好，作为临时性锚泊避风水域，不具有强制性，船舶应根据自身尺度、吃水等实际安全情况合理选择，防止与海上船舶、设施发生碰撞。"
+              }
+            }
+          ]
+        }
+      ],
+      "attributes": {
+        "status": "recommended"
+      },
+      "geometry": "g-por5",
+      "associations": [
+        {
+          "role": "controlAuthority",
+          "target": "auth-pingtan",
+          "source": "闽航通〔2025〕0438号"
+        }
+      ]
+    },
+    {
+      "ref": "por6",
+      "type": "PlaceOfRefuge",
+      "featureName": {
+        "eng": "Recommended Vessel Evasion Waters South of Eagle Shipyard",
+        "zho": "雄鹰船厂南侧船舶避险推荐水域"
+      },
+      "textContent": [
+        {
+          "categoryOfText": "extract",
+          "information": [
+            {
+              "headline": {
+                "eng": "Berthing Requirements",
+                "zho": "停泊要求"
+              },
+              "text": {
+                "eng": "(1) Berthing Arrangements: vessels at berth shall make reasonable use of the designated evasion area waters, adopting side-by-side mooring with secure fastening measures to cope with adverse sea conditions, while using ship anchors to stabilise the hull after beaching.\r(2) Crew Safety Measures: except during Level 2 or higher typhoon emergency responses, or when the competent authority requires all personnel to evacuate, vessels shall arrange crew members to implement safety measures including fire prevention and anchor watch.\r(3) Communication Equipment: vessels shall keep VHF and other equipment in working order to ensure uninterrupted communication with the competent authority.\r(4) Pollution Prevention: while berthed, vessels shall take effective measures to prevent ship-source pollution, and shall not discharge oil, garbage or domestic sewage into the waters.\r(5) Dangerous Goods Vessels: dangerous goods carriers are not permitted to anchor within the recommended waters of Pingtan jurisdiction; where temporary anchorage is required in special circumstances, advance reporting to Pingtan MSA is mandatory.",
+                "zho": "（一）停泊船舶应合理利用避险区的水域，采取并靠加上安全的系固措施以应对恶劣海况，同时冲滩后使用船锚固定船体；\r（二）除二级及以上防台应急响应或主管单位要求需将人员全部撤离之外，平时船舶需安排船员落实防火、防走锚等安全保障措施；\r（三）船舶应保持甚高频等设备正常工作，确保与主管单位的通讯畅通，以便及时接收和传达相关信息和指令；\r（四）船舶在停泊期间应采取有效措施防止船舶污染，禁止向水域排放油类、垃圾、生活污水等污染物，保护海洋环境；\r（五）危险品运输船舶不允许在平潭辖区推荐水域锚泊，因特殊情况需要临时锚泊的，应提前向平潭海事局报告。"
+              }
+            },
+            {
+              "headline": {
+                "eng": "Precautions",
+                "zho": "注意事项"
+              },
+              "text": {
+                "eng": "The six recommended evasion zones offer favourable shelter and good seabed quality. As temporary anchorages for weather evasion they are not mandatory; vessels shall choose a zone according to their own dimensions, draught and actual safety conditions, and avoid collision with other vessels.",
+                "zho": "推荐的6个避险区掩护条件较好、底质良好，作为临时性锚泊避风水域，不具有强制性，船舶应根据自身尺度、吃水等实际安全情况合理选择，防止与海上船舶、设施发生碰撞。"
+              }
+            }
+          ]
+        }
+      ],
+      "attributes": {
+        "status": "recommended"
+      },
+      "geometry": "g-por6",
+      "associations": [
+        {
+          "role": "controlAuthority",
+          "target": "auth-pingtan",
+          "source": "闽航通〔2025〕0438号"
+        }
+      ]
+    }
+  ]
+}

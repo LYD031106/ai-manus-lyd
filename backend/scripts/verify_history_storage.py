@@ -19,12 +19,17 @@ from app.core.config import get_settings
 from app.domain.models.event import MessageEvent
 from app.domain.models.session import Session
 from app.infrastructure.models.documents import SessionDocument
+from app.infrastructure.repositories import mongo_session_repository as repository_module
 from app.infrastructure.repositories.mongo_session_repository import MongoSessionRepository
 from app.infrastructure.storage.session_event_store import MongoSessionEventStore, _digest
 
 
 def report(case, **data):
     print(json.dumps({"case": case, **data}, default=str), flush=True)
+
+
+async def _ignore_session_notification(*args, **kwargs):
+    """The isolated MongoDB probe must never publish into application Redis."""
 
 
 async def main():
@@ -37,6 +42,10 @@ async def main():
     assert name != settings.mongodb_database and name.startswith("manus_history_verify_")
     db = client[name]
     store = MongoSessionEventStore(db)
+    original_upsert = repository_module.publish_session_upsert
+    original_remove = repository_module.publish_session_remove
+    repository_module.publish_session_upsert = _ignore_session_notification
+    repository_module.publish_session_remove = _ignore_session_notification
     try:
         await client.admin.command("ping")
         await store.ensure_indexes()
@@ -93,9 +102,13 @@ async def main():
         report("session_delete_isolation", preserved_events=4)
         report("PASS", database=name, production_database_modified=False)
     finally:
-        await client.drop_database(name)
-        report("cleanup", temporary_database_removed=name)
-        await client.close()
+        repository_module.publish_session_upsert = original_upsert
+        repository_module.publish_session_remove = original_remove
+        try:
+            await client.drop_database(name)
+            report("cleanup", temporary_database_removed=name)
+        finally:
+            await client.close()
 
 
 if __name__ == "__main__":

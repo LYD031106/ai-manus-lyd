@@ -179,6 +179,7 @@ export default {
   'Give Manus a task to work on...': '给 Manus 一个任务...',
   'Assign a task or type / to see more': '分配一个任务或输入 / 查看更多',
   'Send message to Manus': '向 Manus 发送消息',
+  'Process the attached files': '请处理上传的文件',
   'Add files and more': '添加文件等',
   'Add local files': '从本地文件添加',
   'You can choose to take over the browser to complete the operation.': '你可以选择接管浏览器以完成操作。',
@@ -428,8 +429,10 @@ export default {
   'Claw has stopped, please recreate to continue chatting.': 'Claw 已停止运行，请重新创建以继续对话。',
   'Delete and recreate': '删除并重新创建',
   'An error occurred': '发生错误',
+  'Chat request failed: {error}': '模型请求失败：{error}',
+  'Unknown error': '未知错误',
   'Creation failed, please try again later': '创建失败，请稍后重试',
   'Please check {count} attachment(s) I sent': '（请查看我发送的 {count} 个附件）',
   'WebSocket not connected, please try again later': 'WebSocket 未连接，请稍后重试',
   'Claw has expired, please recreate.': 'Claw 已过期，请重新创建。',
-} 
+}

@@ -1,4 +1,4 @@
-import type { Ref } from 'vue';
+import { shallowRef, type Ref } from 'vue';
 import {
   Message,
   MessageContent,
@@ -37,10 +37,15 @@ export interface AgentEventOptions {
  * Used by both ChatPage (live chat) and SharePage (replay).
  */
 export function useAgentEvents(state: AgentEventState, options: AgentEventOptions = {}) {
-  const { messages, title, plan, lastEventId, lastTool, lastNoMessageTool } = state;
+  // Replay into detached shallow refs, then publish the complete history once.
+  let activeState = state;
 
   const getLastStep = (): StepContent | undefined => {
-    return messages.value.filter(message => message.type === 'step').pop()?.content as StepContent;
+    for (let index = activeState.messages.value.length - 1; index >= 0; index--) {
+      const message = activeState.messages.value[index];
+      if (message.type === 'step') return message.content as StepContent;
+    }
+    return undefined;
   };
 
   const handleMessageEvent = (messageData: MessageEventData) => {
@@ -48,7 +53,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     const text = (messageData.content ?? '').trim();
     if (messageData.role === 'assistant' && !text) {
       if (messageData.attachments && messageData.attachments.length > 0) {
-        messages.value.push({
+        activeState.messages.value.push({
           type: 'attachments',
           content: {
             ...messageData
@@ -60,7 +65,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
 
     // User turn: keep attachments on the same ChatQuestion shell (images above bubble).
     if (messageData.role === 'user') {
-      messages.value.push({
+      activeState.messages.value.push({
         type: 'user',
         content: {
           ...messageData,
@@ -70,7 +75,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
       return;
     }
 
-    messages.value.push({
+    activeState.messages.value.push({
       type: messageData.role,
       content: {
         ...messageData
@@ -78,7 +83,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     });
 
     if (messageData.attachments && messageData.attachments.length > 0) {
-      messages.value.push({
+      activeState.messages.value.push({
         type: 'attachments',
         content: {
           ...messageData
@@ -92,13 +97,14 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     const toolContent: ToolContent = {
       ...toolData
     };
+    const lastTool = activeState.lastTool;
     if (lastTool.value && lastTool.value.tool_call_id === toolContent.tool_call_id) {
       Object.assign(lastTool.value, toolContent);
     } else {
       if (lastStep?.status === 'running') {
         lastStep.tools.push(toolContent);
       } else {
-        messages.value.push({
+        activeState.messages.value.push({
           type: 'tool',
           content: toolContent,
         });
@@ -106,15 +112,15 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
       lastTool.value = toolContent;
     }
     if (toolContent.name !== 'message') {
-      lastNoMessageTool.value = toolContent;
-      options.onToolActivity?.(toolContent);
+      activeState.lastNoMessageTool.value = toolContent;
+      if (activeState === state) options.onToolActivity?.(toolContent);
     }
   };
 
   const handleStepEvent = (stepData: StepEventData) => {
     const lastStep = getLastStep();
     if (stepData.status === 'running') {
-      messages.value.push({
+      activeState.messages.value.push({
         type: 'step',
         content: {
           ...stepData,
@@ -126,13 +132,14 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
         lastStep.status = stepData.status;
       }
     } else if (stepData.status === 'failed') {
-      options.onStreamError?.();
+      if (lastStep) lastStep.status = stepData.status;
+      if (activeState === state) options.onStreamError?.();
     }
   };
 
   const handleErrorEvent = (errorData: ErrorEventData) => {
-    options.onStreamError?.();
-    messages.value.push({
+    if (activeState === state) options.onStreamError?.();
+    activeState.messages.value.push({
       type: 'assistant',
       content: {
         content: errorData.error,
@@ -142,11 +149,11 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
   };
 
   const handleTitleEvent = (titleData: TitleEventData) => {
-    title.value = titleData.title;
+    activeState.title.value = titleData.title;
   };
 
   const handlePlanEvent = (planData: PlanEventData) => {
-    plan.value = planData;
+    activeState.plan.value = planData;
   };
 
   const handleEvent = (event: AgentEvent) => {
@@ -175,8 +182,35 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     } else if (event.event === 'plan') {
       handlePlanEvent(event.data as PlanEventData);
     }
-    lastEventId.value = event.data.event_id;
+    activeState.lastEventId.value = event.data.event_id;
   };
 
-  return { handleEvent };
+  const replayEvents = (events: AgentEvent[]) => {
+    const replayState: AgentEventState = {
+      messages: shallowRef<Message[]>([]),
+      title: shallowRef(state.title.value),
+      plan: shallowRef<PlanEventData>(),
+      lastEventId: shallowRef<string>(),
+      lastTool: shallowRef<ToolContent>(),
+      lastNoMessageTool: shallowRef<ToolContent>(),
+    };
+    const previousState = activeState;
+    activeState = replayState;
+    try {
+      for (const event of events) {
+        handleEvent(event);
+      }
+    } finally {
+      activeState = previousState;
+    }
+
+    state.messages.value = replayState.messages.value;
+    state.title.value = replayState.title.value;
+    state.plan.value = replayState.plan.value;
+    state.lastEventId.value = replayState.lastEventId.value;
+    state.lastTool.value = replayState.lastTool.value;
+    state.lastNoMessageTool.value = replayState.lastNoMessageTool.value;
+  };
+
+  return { handleEvent, replayEvents };
 }

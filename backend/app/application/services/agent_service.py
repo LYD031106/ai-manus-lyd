@@ -132,7 +132,8 @@ class AgentService:
         if not session:
             logger.error(f"Session {session_id} not found for user {user_id}")
             raise RuntimeError("Session not found")
-        
+
+        await self._agent_domain_service.destroy_session_resources(session)
         await self._session_repository.delete(session_id)
         logger.info(f"Session {session_id} deleted successfully")
 
@@ -383,3 +384,8 @@ class AgentService:
             logger.error(f"Shared session {session_id} not found or not shared")
             return None
         return session
+
+    async def get_session_history(self, session_id: str, user_id: str) -> Optional[Session]:
+        """Get a session using the lightweight history projection."""
+        logger.info(f"Getting session history {session_id} for user {user_id}")
+        return await self._session_repository.find_history_by_id_and_user_id(session_id, user_id)

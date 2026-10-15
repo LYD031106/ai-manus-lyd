@@ -416,3 +416,23 @@ async def test_externalized_history_preserves_pinned_summary_and_notifications(s
     assert summary.is_pinned is True
     assert await repository.find_summary_by_id_and_user_id("pinned", "intruder") is None
     repository_module.publish_session_upsert.assert_awaited_once_with("owner", "pinned")
+
+
+async def test_history_projection_keeps_pin_favorite_and_project(storage, repository, monkeypatch):
+    db, _, _ = storage
+    session = Session(id="project-history", user_id="owner", agent_id="agent",
+                      is_pinned=True, is_favorite=True, project_id="project")
+    await repository.save(session)
+    collection = db["sessions"]
+    original_find = collection.find_one
+
+    async def projected_find(query, projection=None):
+        doc = await original_find(query, projection)
+        if doc and projection:
+            return {key: value for key, value in doc.items() if projection.get(key)}
+        return doc
+
+    monkeypatch.setattr(collection, "find_one", projected_find)
+    history = await repository.find_history_by_id_and_user_id(session.id, "owner")
+    assert history.is_pinned and history.is_favorite
+    assert history.project_id == "project"
