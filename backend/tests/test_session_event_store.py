@@ -402,3 +402,23 @@ async def test_new_save_externalizes_prepopulated_events(storage, repository):
     await repository.save(session)
     assert (await db["sessions"].find_one({"session_id": "s1"}))["events"] == []
     assert (await store.load("s1"))[0]["message"] == "hi"
+
+
+async def test_history_projection_keeps_favorite_and_project(storage, repository, monkeypatch):
+    db, _, _ = storage
+    session = Session(id="project-history", user_id="owner", agent_id="agent",
+                      is_favorite=True, project_id="project")
+    await repository.save(session)
+    collection = db["sessions"]
+    original_find = collection.find_one
+
+    async def projected_find(query, projection=None):
+        doc = await original_find(query, projection)
+        if doc and projection:
+            return {key: value for key, value in doc.items() if projection.get(key)}
+        return doc
+
+    monkeypatch.setattr(collection, "find_one", projected_find)
+    history = await repository.find_history_by_id_and_user_id(session.id, "owner")
+    assert history.is_favorite
+    assert history.project_id == "project"

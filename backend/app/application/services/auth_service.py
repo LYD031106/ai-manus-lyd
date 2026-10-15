@@ -50,7 +50,6 @@ class AuthService:
             # Generate hash with extracted salt
             generated_hash = self._hash_password(password)
 
-            logger.info(f"Generated hash: {generated_hash} vs expected hash: {password_hash}")
             return generated_hash == password_hash
         except Exception as e:
             logger.error(f"Password verification error: {e}")
@@ -203,7 +202,16 @@ class AuthService:
         
         # Get user from database
         user_id = payload.get("sub")
-        user = await self.user_repository.get_user_by_id(user_id)
+        if self.settings.auth_provider == "local" and user_id == "local_admin":
+            user = User(
+                id="local_admin",
+                fullname="Local Admin",
+                email=self.settings.local_auth_email,
+                role=UserRole.ADMIN,
+                is_active=True,
+            )
+        else:
+            user = await self.user_repository.get_user_by_id(user_id)
         
         if not user or not user.is_active:
             raise UnauthorizedError("User not found or inactive")
@@ -220,11 +228,13 @@ class AuthService:
         """Verify JWT token and return user"""
         user_info = self.token_service.get_user_from_token(token)
         
-        if not user_info:
+        if not user_info or user_info.get("token_type", "access") != "access":
             return None
         
         # For database users, verify user still exists and is active
-        if self.settings.auth_provider == "password":
+        if self.settings.auth_provider == "password" or (
+            self.settings.auth_provider == "local" and user_info["id"] != "local_admin"
+        ):
             user = await self.user_repository.get_user_by_id(user_info["id"])
             if not user or not user.is_active:
                 return None

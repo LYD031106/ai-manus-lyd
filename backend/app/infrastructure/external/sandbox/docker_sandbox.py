@@ -478,7 +478,11 @@ class DockerSandbox(Sandbox):
             return None
     
     async def destroy(self) -> bool:
-        """Destroy Docker sandbox"""
+        """Destroy an owned container; leave a shared fixed runtime available."""
+        if not self._container_name:
+            # SANDBOX_ADDRESS is owned by the deployment, and get() caches its
+            # HTTP client across sessions. One session must not close it.
+            return True
         try:
             if self.client:
                 await self.client.aclose()
@@ -572,7 +576,8 @@ class DockerSandbox(Sandbox):
         settings = get_settings()
         if settings.sandbox_address:
             ip = await cls._resolve_hostname_to_ip(settings.sandbox_address)
-            return DockerSandbox(ip=ip, container_name=id)
+            # A logical session ID does not confer ownership of this runtime.
+            return DockerSandbox(ip=ip)
 
         docker_client = docker.from_env()
         container = docker_client.containers.get(id)

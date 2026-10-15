@@ -178,7 +178,7 @@ const toolHistory = computed(() => {
 });
 
 // Shared SSE event -> message list conversion
-const { handleEvent } = useAgentEvents(
+const { handleEvent, replayEvents } = useAgentEvents(
   { messages, title, plan, isLoading, lastEventId, lastTool, lastNoMessageTool },
   {
     onToolActivity: (tool: ToolContent) => {
@@ -235,9 +235,7 @@ const restoreSession = async () => {
   const session = await agentApi.getSharedSession(sessionId.value);
   realTime.value = false;
   follow.value = false; // Prevent auto-scrolling during restoration
-  for (const event of session.events) {
-    handleEvent(event);
-  }
+  replayEvents(session.events);
   realTime.value = true;
 }
 

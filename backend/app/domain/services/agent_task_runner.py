@@ -252,7 +252,9 @@ class AgentTaskRunner(TaskRunner):
         try:
             logger.info(f"Agent {self._agent_id} message processing task started")
 
+            terminal_published = False
             while not await task.input_stream.is_empty():
+                terminal_published = False
                 session = await self._session_repository.find_by_id(self._session_id)
                 is_chat = bool(session and session.task_mode == TaskMode.CHAT)
 
@@ -283,23 +285,39 @@ class AgentTaskRunner(TaskRunner):
                 # the same agents, including waits, cancellation and errors.
                 async with aclosing(flow):
                     async for event in flow:
+                        terminal = isinstance(event, (DoneEvent, WaitEvent, ErrorEvent))
+                        if terminal:
+                            # Cleanup may persist tool replies. Complete it before
+                            # a client can observe the end of this run.
+                            await flow.aclose()
+                            if isinstance(event, WaitEvent):
+                                await self._session_repository.update_status(self._session_id, SessionStatus.WAITING)
+                            if isinstance(event, DoneEvent) and not await task.input_stream.is_empty():
+                                # A completed turn does not complete the task
+                                # while another input is already queued.
+                                break
+                            if not isinstance(event, WaitEvent):
+                                await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
                         await self._put_and_add_event(task, event)
+                        if terminal:
+                            terminal_published = True
+                            if isinstance(event, WaitEvent):
+                                return
+                            break
                         if isinstance(event, TitleEvent):
                             await self._session_repository.update_title(self._session_id, event.title)
                         elif isinstance(event, MessageEvent):
                             await self._session_repository.update_latest_message(self._session_id, event.message, event.timestamp)
                             await self._session_repository.increment_unread_message_count(self._session_id)
-                        elif isinstance(event, WaitEvent):
-                            await self._session_repository.update_status(self._session_id, SessionStatus.WAITING)
-                            return
                         if not await task.input_stream.is_empty():
                             break
 
-            await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
+            if not terminal_published:
+                await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
         except asyncio.CancelledError:
             logger.info(f"Agent {self._agent_id} task cancelled")
-            await self._put_and_add_event(task, DoneEvent())
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
+            await self._put_and_add_event(task, DoneEvent())
         except Exception as e:
             logger.exception(f"Agent {self._agent_id} task encountered exception: {str(e)}")
             
@@ -311,8 +329,8 @@ class AgentTaskRunner(TaskRunner):
                 traceback.print_exc()
                 debugpy.breakpoint()  # This will pause execution if a debugger is attached
             
-            await self._put_and_add_event(task, ErrorEvent(error=f"Task error: {str(e)}"))
             await self._session_repository.update_status(self._session_id, SessionStatus.COMPLETED)
+            await self._put_and_add_event(task, ErrorEvent(error=f"Task error: {str(e)}"))
     
     async def _run_chat(self, message: Message) -> AsyncGenerator[BaseEvent, None]:
         """Lightweight Chat mode: single LLM reply without tools / plan-act."""

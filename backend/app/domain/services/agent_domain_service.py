@@ -1,5 +1,6 @@
 from typing import Optional, AsyncGenerator, List
 import logging
+import re
 from datetime import datetime
 from app.domain.models.session import Session, SessionStatus
 from app.domain.external.sandbox import Sandbox
@@ -18,6 +19,35 @@ from app.domain.repositories.mcp_repository import MCPRepository
 
 # Setup logging
 logger = logging.getLogger(__name__)
+
+
+def _is_stream_cursor(value: Optional[str]) -> bool:
+    if not value or not re.fullmatch(r"[0-9]{1,20}-[0-9]{1,20}", value):
+        return False
+    return all(int(part) <= 2**64 - 1 for part in value.split("-"))
+
+
+def _resume_stream_cursor(value: Optional[str], events: List[AgentEvent]) -> Optional[str]:
+    """Translate a durable history anchor into a Redis output-stream cursor.
+
+    Inputs and startup errors can be persisted before a task stream exists, so
+    their UUIDs are history identities only. Resume from the last preceding
+    output cursor; an unknown anchor replays the output stream from its start.
+    This changes event delivery only, never enqueues or executes tools.
+    """
+    if value is None or _is_stream_cursor(value):
+        return value
+    for index in range(len(events) - 1, -1, -1):
+        if events[index].id == value:
+            for event in reversed(events[:index]):
+                # Older user events carry input-stream IDs, not output cursors.
+                if isinstance(event, MessageEvent) and event.role == "user":
+                    continue
+                if _is_stream_cursor(event.id):
+                    return event.id
+            break
+    return "0-0"
+
 
 class AgentDomainService:
     """
@@ -142,6 +172,7 @@ class AgentDomainService:
                 logger.error(f"Attempted to chat with non-existent Session {session_id} for user {user_id}")
                 raise RuntimeError("Session not found")
 
+            latest_event_id = _resume_stream_cursor(latest_event_id, session.events)
             task = await self._get_task(session)
 
             if message or attachments:

@@ -84,19 +84,22 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy project files (copy dependency files first to leverage cache)
-COPY pyproject.toml ./
+COPY sandbox/pyproject.toml sandbox/README.md ./
 
 # Install Python dependencies
 RUN uv sync --no-dev
 
 # Copy remaining project files
-COPY . .
+COPY sandbox/app ./app
+COPY sandbox/supervisord.conf ./supervisord.conf
+COPY builtin_skills/s127-gml /opt/skills/s127-gml
 
 # Ensure application files are writable by app user
-RUN chown -R ubuntu:ubuntu /app
+RUN chmod +x /opt/skills/s127-gml/scripts/*.py && \
+    chown -R ubuntu:ubuntu /app /opt/skills
 
 # Configure supervisor
-COPY supervisord.conf /etc/supervisor/conf.d/app.conf
+COPY sandbox/supervisord.conf /etc/supervisor/conf.d/app.conf
 
 # Expose ports
 EXPOSE 8080 9222 5900 5901

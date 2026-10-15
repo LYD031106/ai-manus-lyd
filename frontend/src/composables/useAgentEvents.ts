@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue';
+import { shallowRef, type Ref } from 'vue';
 import {
   Message,
   MessageContent,
@@ -37,12 +37,16 @@ export interface AgentEventOptions {
  */
 export function useAgentEvents(state: AgentEventState, options: AgentEventOptions = {}) {
   // Live SSE events update the component refs directly. History replay uses a
-  // temporary plain ref state and commits it once, so Vue only renders the
+  // temporary shallow ref state and commits it once, so Vue only renders the
   // final message list instead of observing every historical event.
   let activeState = state;
 
   const getLastStep = (): StepContent | undefined => {
-    return activeState.messages.value.filter(message => message.type === 'step').pop()?.content as StepContent;
+    for (let index = activeState.messages.value.length - 1; index >= 0; index--) {
+      const message = activeState.messages.value[index];
+      if (message.type === 'step') return message.content as StepContent;
+    }
+    return undefined;
   };
 
   const handleMessageEvent = (messageData: MessageEventData) => {
@@ -98,7 +102,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
     }
     if (toolContent.name !== 'message') {
       activeState.lastNoMessageTool.value = toolContent;
-      options.onToolActivity?.(toolContent);
+      if (activeState === state) options.onToolActivity?.(toolContent);
     }
   };
 
@@ -117,6 +121,7 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
         lastStep.status = stepData.status;
       }
     } else if (stepData.status === 'failed') {
+      if (lastStep) lastStep.status = stepData.status;
       activeState.isLoading.value = false;
     }
   };
@@ -163,13 +168,13 @@ export function useAgentEvents(state: AgentEventState, options: AgentEventOption
 
   const replayEvents = (events: AgentSSEEvent[]) => {
     const replayState: AgentEventState = {
-      messages: ref<Message[]>([]),
-      title: ref(state.title.value),
-      plan: ref(state.plan.value),
-      isLoading: ref(state.isLoading.value),
-      lastEventId: ref(state.lastEventId.value),
-      lastTool: ref(state.lastTool.value),
-      lastNoMessageTool: ref(state.lastNoMessageTool.value),
+      messages: shallowRef<Message[]>([]),
+      title: shallowRef(state.title.value),
+      plan: shallowRef<PlanEventData>(),
+      isLoading: shallowRef(state.isLoading.value),
+      lastEventId: shallowRef<string>(),
+      lastTool: shallowRef<ToolContent>(),
+      lastNoMessageTool: shallowRef<ToolContent>(),
     };
     const previousState = activeState;
     activeState = replayState;

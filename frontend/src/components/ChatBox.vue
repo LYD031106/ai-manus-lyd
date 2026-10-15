@@ -39,6 +39,7 @@
                 </button>
                 <div class="flex gap-1.5 ml-auto items-center">
                     <button v-if="!isRunning || sendEnabled || hideStopButton"
+                        data-testid="send-message" :disabled="!sendEnabled"
                         class="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors text-sm rounded-full p-0 w-8 h-8 min-w-0 hover:opacity-90"
                         :class="!sendEnabled ? 'cursor-not-allowed bg-[var(--fill-tsp-white-dark)] hover:opacity-100' : 'cursor-pointer bg-[var(--Button-primary-black)]'"
                         @click="handleSubmit">
@@ -88,11 +89,9 @@ const placeholderText = computed(() => props.placeholder || t('Give Manus a task
 
 const sendEnabled = computed(() => {
     const hasFiles = (props.attachments?.length ?? 0) > 0;
-    const allUploaded = chatBoxFileListRef.value?.isAllUploaded ?? true;
-    if (props.allowSendFilesOnly) {
-        return hasTextInput.value || (hasFiles && allUploaded);
-    }
-    return hasTextInput.value && (!hasFiles || allUploaded);
+    const allUploaded = chatBoxFileListRef.value?.isAllUploaded ?? false;
+    return (hasTextInput.value || (props.allowSendFilesOnly && hasFiles))
+        && (!hasFiles || allUploaded);
 });
 
 const emit = defineEmits<{

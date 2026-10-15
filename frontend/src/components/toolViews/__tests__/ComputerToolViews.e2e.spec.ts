@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, afterEach, beforeAll } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { nextTick, defineComponent, h } from 'vue'
+import { nextTick } from 'vue'
 import { createI18n } from 'vue-i18n'
 import en from '@/locales/en'
 import FileToolView from '@/components/toolViews/FileToolView.vue'
@@ -14,12 +14,6 @@ const i18n = createI18n({
   legacy: false,
   locale: 'en',
   messages: { en },
-})
-
-const MonacoStub = defineComponent({
-  name: 'MonacoStub',
-  props: ['value', 'original', 'modified', 'filename'],
-  setup: () => () => h('div', { class: 'monaco-stub' }),
 })
 
 beforeAll(() => {
@@ -66,10 +60,6 @@ describe('Computer tool views e2e', () => {
     const wrapper = mount(FileToolView, {
       global: {
         plugins: [i18n],
-        stubs: {
-          MonacoEditor: MonacoStub,
-          MonacoDiffEditor: MonacoStub,
-        },
       },
       props: {
         sessionId: 'sess-1',
@@ -92,16 +82,18 @@ describe('Computer tool views e2e', () => {
     // Official default tab is Modified
     const modified = wrapper.findAll('button').find((b) => b.text() === 'Modified')
     expect(modified?.attributes('data-state')).toBe('on')
+    expect(wrapper.get('pre').text()).toBe('new line')
+    await wrapper.findAll('button').find(button => button.text() === 'Original')!.trigger('click')
+    expect(wrapper.get('pre').text()).toBe('old line')
+    await wrapper.findAll('button').find(button => button.text() === 'Diff')!.trigger('click')
+    expect(wrapper.findAll('pre').map(pre => pre.text())).toEqual(['old line', 'new line'])
+    wrapper.unmount()
   })
 
   it('FileToolView hides tabs when there is no old_content', async () => {
     const wrapper = mount(FileToolView, {
       global: {
         plugins: [i18n],
-        stubs: {
-          MonacoEditor: MonacoStub,
-          MonacoDiffEditor: MonacoStub,
-        },
       },
       props: {
         sessionId: 'sess-1',
@@ -115,6 +107,8 @@ describe('Computer tool views e2e', () => {
     const tabBar = wrapper.find('.backdrop-blur-3xl')
     expect(tabBar.exists()).toBe(true)
     expect(tabBar.element.parentElement?.classList.contains('hidden')).toBe(true)
+    expect(wrapper.get('pre').text()).toBe('only new')
+    wrapper.unmount()
   })
 
   it('ShellToolView mounts xterm host panel', async () => {

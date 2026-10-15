@@ -219,6 +219,7 @@ const sessionStatus = ref<SessionStatus | undefined>(undefined);
 const { showContextMenu } = useContextMenu();
 const isRestoringSession = ref(false);
 let restoreGeneration = 0;
+let lastReportedChatError: string | undefined;
 
 const toolHistory = computed(() => {
   const tools: ToolContent[] = [];
@@ -253,6 +254,8 @@ const resetState = () => {
   // previous route cannot append events to the newly selected session.
   restoreGeneration += 1;
   isRestoringSession.value = false;
+  lastReportedChatError = undefined;
+  sessionStatus.value = undefined;
 
   // Cancel any existing chat connection
   if (cancelCurrentChat.value) {
@@ -285,6 +288,9 @@ const reportChatError = (error: unknown) => {
     ? error.message
     : t('Unknown error');
   const content = t('Chat request failed: {error}', { error: detail });
+  // The SSE error callback and connection promise can report the same failure.
+  if (lastReportedChatError === content) return;
+  lastReportedChatError = content;
 
   messages.value.push({
     type: 'assistant',
@@ -300,6 +306,12 @@ const reportChatError = (error: unknown) => {
 
 const chat = async (message: string = '', files: FileInfo[] = []) => {
   if (!sessionId.value) return;
+  const expectedSessionId = sessionId.value;
+  const currentGeneration = ++restoreGeneration;
+  const isCurrent = () => currentGeneration === restoreGeneration && sessionId.value === expectedSessionId;
+  let connectionEnded = false;
+  isRestoringSession.value = false;
+  lastReportedChatError = undefined;
 
   // Cancel any existing chat connection before starting a new one
   if (cancelCurrentChat.value) {
@@ -340,23 +352,27 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
 
   try {
     // Use the split event handler function and store the cancel function
-    cancelCurrentChat.value = await agentApi.chatWithSession(
-      sessionId.value,
+    const cancel = await agentApi.chatWithSession(
+      expectedSessionId,
       effectiveMessage,
       lastEventId.value,
       files.map((file: FileInfo) => ({file_id : file.file_id, 
                                         filename : file.filename})),
       {
         onOpen: () => {
+          if (!isCurrent() || connectionEnded) return;
           isLoading.value = true;
         },
         onMessage: ({ event, data }) => {
+          if (!isCurrent() || connectionEnded) return;
           handleEvent({
             event: event as AgentSSEEvent['event'],
             data: data as AgentSSEEvent['data']
           });
         },
         onClose: () => {
+          connectionEnded = true;
+          if (!isCurrent()) return;
           isLoading.value = false;
           // Clear the cancel function when connection is closed normally
           if (cancelCurrentChat.value) {
@@ -364,12 +380,19 @@ const chat = async (message: string = '', files: FileInfo[] = []) => {
           }
         },
         onError: (error) => {
+          connectionEnded = true;
+          if (!isCurrent()) return;
           console.error('Chat error:', error);
+          cancelCurrentChat.value?.();
           reportChatError(error);
         }
       }
     );
+    // A route change or close can occur before connection setup resolves.
+    if (!isCurrent() || connectionEnded) cancel();
+    else cancelCurrentChat.value = cancel;
   } catch (error) {
+    if (!isCurrent()) return;
     console.error('Chat error:', error);
     reportChatError(error);
   }
@@ -380,13 +403,16 @@ const restoreSession = async () => {
     showErrorToast(t('Session not found'));
     return;
   }
+  const expectedSessionId = sessionId.value;
   const currentGeneration = ++restoreGeneration;
+  const isCurrent = () => currentGeneration === restoreGeneration && sessionId.value === expectedSessionId;
+  lastReportedChatError = undefined;
   isRestoringSession.value = true;
   isLoading.value = true;
 
   try {
-    const session = await agentApi.getSession(sessionId.value);
-    if (currentGeneration !== restoreGeneration) return;
+    const session = await agentApi.getSession(expectedSessionId);
+    if (!isCurrent()) return;
 
     // Initialize share mode based on session state
     shareMode.value = session.is_shared ? 'public' : 'private';
@@ -394,25 +420,29 @@ const restoreSession = async () => {
     realTime.value = false;
     replayEvents(session.events);
     realTime.value = true;
-    isRestoringSession.value = false;
     await nextTick();
+    if (!isCurrent()) return;
+    isRestoringSession.value = false;
     if (follow.value) {
       simpleBarRef.value?.scrollToBottom();
     }
 
+    // Clear only the restored session, before chat takes over the generation.
+    void agentApi.clearUnreadMessageCount(expectedSessionId).catch(error => {
+      console.error('Failed to clear unread messages:', error);
+    });
     if (session.status === SessionStatus.RUNNING || session.status === SessionStatus.PENDING) {
       await chat();
     } else {
       isLoading.value = false;
     }
-    agentApi.clearUnreadMessageCount(sessionId.value);
   } catch (error) {
-    if (currentGeneration === restoreGeneration) {
+    if (isCurrent()) {
       isRestoringSession.value = false;
       reportChatError(error);
     }
   } finally {
-    if (currentGeneration === restoreGeneration) {
+    if (isCurrent()) {
       isRestoringSession.value = false;
     }
   }
@@ -452,6 +482,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  restoreGeneration += 1;
   if (cancelCurrentChat.value) {
     cancelCurrentChat.value();
     cancelCurrentChat.value = null;

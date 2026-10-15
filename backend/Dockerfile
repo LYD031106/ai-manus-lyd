@@ -16,11 +16,14 @@ RUN pip install uv
 ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 
 # Install dependencies
-COPY pyproject.toml ./
+COPY backend/pyproject.toml backend/README.md ./
 RUN uv sync --no-dev
 
 # Copy project files
-COPY . .
+COPY backend/app ./app
+COPY backend/scripts ./scripts
+COPY backend/start_worker.sh ./start_worker.sh
+COPY builtin_skills/s127-gml/SKILL.md ./builtin_skills/s127-gml/SKILL.md
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -29,4 +32,4 @@ ENV PYTHONPATH=/app
 EXPOSE 8000
 
 # Start command
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

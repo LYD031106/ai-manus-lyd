@@ -34,6 +34,8 @@ SESSION_HISTORY_PROJECTION = {
     "title": 1,
     "status": 1,
     "is_shared": 1,
+    "is_favorite": 1,
+    "project_id": 1,
     "task_mode": 1,
     "events": 1,
 }
