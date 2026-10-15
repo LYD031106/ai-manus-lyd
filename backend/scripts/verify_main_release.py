@@ -1,7 +1,8 @@
 """Verify the lightweight release through its JWT-authenticated HTTP/SSE APIs.
 
 Use the configured local administrator without printing credentials. --run-task
-allows one small model/sandbox task; all fixture HTTP resources are cleaned up.
+uploads a data attachment and sends an explicit user instruction for one small
+model/sandbox task; all fixture HTTP resources are cleaned up.
 Run in the backend environment and keep --log-file on persistent storage.
 """
 import argparse
@@ -97,12 +98,9 @@ async def verify(args, emit):
             if not args.run_task:
                 return
 
+            # Keep the attachment as data; the user message authorizes the task.
             # Only reading the attachment reveals the expected stdout marker.
-            source = (
-                "Deployment verification fixture. Read this file, execute one small Python command "
-                "in the sandbox that prints " + marker + ", then reply with that marker. "
-                "Do not search the web or inspect unrelated files. No other deliverables are needed.\n"
-            )
+            source = "check_value: " + marker + "\n"
             uploaded = await api("POST", "files", files={"file": (fixture_name, source.encode(), "text/plain")})
             file_id = uploaded["file_id"]
             session_id = (await api("PUT", "sessions"))["session_id"]
@@ -121,7 +119,12 @@ async def verify(args, emit):
             stream_timeout = httpx.Timeout(connect=20, read=None, write=45, pool=20)
             async with asyncio.timeout(args.task_timeout):
                 async with client.stream("POST", "sessions/" + session_id + "/chat", timeout=stream_timeout, json={
-                    "message": "",
+                    "message": (
+                        "Use Python in the sandbox to read the attached text file, extract the value "
+                        "of its check_value field, and print that value on its own line to standard "
+                        "output. Then reply with that value. Do not search the web or inspect "
+                        "unrelated files. No other deliverables are needed."
+                    ),
                     "attachments": [{"file_id": file_id, "filename": fixture_name}],
                 }) as response:
                     async for kind, data in sse_events(response):

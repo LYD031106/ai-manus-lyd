@@ -306,7 +306,7 @@ docker run --rm \
 
 至少手工验证登录、新建对话、文件上传、Sandbox Python 执行和 PDF/Office 处理。
 
-`backend/scripts/verify_main_release.py` 使用本分支的 JWT / Bearer 与 HTTP / SSE 接口验证登录、`refresh_token` 刷新、历史读取及 `POST /sessions` 会话列表流。指定 `--run-task` 后，脚本上传独立测试附件，以仅附件输入发起一个真实模型短任务，核验实际 Shell 标准输出、REST Shell 回读、最终 `completed` 状态和持久化历史；随后以空消息和历史 UUID 事件 ID 恢复 SSE，检查没有新增历史或重跑任务。最后分别清理测试会话、上传文件并注销登录。脚本需在 Backend 环境运行，指定持久路径 `--log-file`；日志不打印凭据。真实模型任务会调用配置的模型服务，必须在镜像构建结束、主机资源恢复后串行执行。
+`backend/scripts/verify_main_release.py` 使用本分支的 JWT / Bearer 与 HTTP / SSE 接口验证登录、`refresh_token` 刷新、历史读取及 `POST /sessions` 会话列表流。指定 `--run-task` 后，脚本上传仅含 `check_value` 数据的独立测试附件，并通过明确用户指令要求用 Python 读取附件、提取并打印该值，最后回复该值；预期值只保存在附件中。脚本核验实际 Shell 标准输出、REST Shell 回读、最终 `completed` 状态和持久化历史；随后以空消息和历史 UUID 事件 ID 恢复 SSE，检查没有新增历史或重跑任务。最后分别清理测试会话、上传文件并注销登录。脚本需在 Backend 环境运行，指定持久路径 `--log-file`；日志不打印凭据。真实模型任务会调用配置的模型服务，必须在镜像构建结束、主机资源恢复后串行执行。
 
 ## 5. 回滚
 
