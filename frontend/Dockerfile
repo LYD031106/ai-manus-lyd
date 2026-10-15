@@ -33,7 +33,9 @@ COPY nginx.conf /etc/nginx/nginx.conf.template
 # Copy entrypoint script
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.sh \
-    && chmod +x /docker-entrypoint.sh
+    && chmod +x /docker-entrypoint.sh \
+    && find /usr/share/nginx/html -type d -exec chmod 755 {} + \
+    && find /usr/share/nginx/html -type f -exec chmod 644 {} +
 
 # Expose port 80
 EXPOSE 80

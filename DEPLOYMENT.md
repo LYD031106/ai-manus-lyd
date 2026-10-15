@@ -172,6 +172,8 @@ Sandbox 镜像包含 Python、openpyxl、PDF/Word 依赖和 S-127 GML Skill。
 
 前端代码发生变化时才重新构建 Frontend。小内存服务器优先在本机使用锁定依赖执行 `npm ci`、检查和 `npm run build`，再打包 `dist`、`nginx.conf`、`docker-entrypoint.sh` 与仅复制这些文件的 Nginx 运行时 Dockerfile；包中不放 `.env`、源码依赖目录或凭据。服务器核对提交号及包校验和后，只构建该运行时镜像。
 
+预编译包必须包含显式的目录条目，目录权限为 `755`、静态文件权限为 `644`。只打包普通文件时，服务器在 `umask 077` 下解包会隐式创建 `700` 目录，Nginx worker 无法进入 `assets`。运行时 Dockerfile 在 `COPY` 后也须执行 `find /usr/share/nginx/html -type d -exec chmod 755 {} +` 和 `find /usr/share/nginx/html -type f -exec chmod 644 {} +`，保证最终镜像的权限正确。
+
 如果确认服务器有足够余量并选择在服务器完整编译，通过构建参数把 Node 堆上限设为 320 MiB，再使用限额串行构建：
 
 ~~~bash
@@ -273,6 +275,8 @@ Mongo 使用 manus-mongodb-data 卷，正常更新不会删除对话数据。
 docker ps --format '{{.Names}}|{{.Image}}|{{.Status}}'
 curl -fsS http://127.0.0.1/api/v1/config/frontend
 ~~~
+
+前端部署验证应通过 HTTP 请求全部 `dist` 资源，并将解压后的响应内容与产物清单逐项比对 SHA256；至少必须请求当前 `index.html` 引用的入口 JS 和 CSS，确认内容分别为 JavaScript、CSS，且 MIME 为 `application/javascript`（或 `text/javascript`）和 `text/css`。不能只检查首页或资源 URL 返回 `200`：资源不可读时，SPA fallback 可能返回首页 HTML，造成白屏。
 
 验证新增工具：
 
