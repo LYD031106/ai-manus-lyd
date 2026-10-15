@@ -7,6 +7,8 @@ import pytest
 from app.domain.models.event import DoneEvent, ErrorEvent, MessageEvent
 from app.domain.models.session import Session, SessionStatus
 from app.domain.services.agent_domain_service import AgentDomainService
+from app.application.services.agent_service import AgentService
+from app.domain.models.file import FileInfo
 
 
 def make_domain(events, status=SessionStatus.RUNNING):
@@ -78,3 +80,21 @@ async def test_valid_stream_cursor_preserved_and_unknown_cursor_replays_only(cur
     task.input_stream.put.assert_not_awaited()
     task.run.assert_not_awaited()
     repository.add_event.assert_not_awaited()
+
+
+@pytest.mark.parametrize("attachment_only", [False, True])
+async def test_service_allows_none_message_for_sse_resume_and_attachments(attachment_only):
+    calls = []
+    attachments = [FileInfo(file_id="file", filename="report.txt")] if attachment_only else None
+
+    async def chat(*args):
+        calls.append(args)
+        yield DoneEvent()
+
+    service = object.__new__(AgentService)
+    service._agent_domain_service = SimpleNamespace(chat=chat)
+    events = [event async for event in service.chat(
+        "session", "owner", message=None, event_id="123-0", attachments=attachments,
+    )]
+    assert len(events) == 1 and isinstance(events[0], DoneEvent)
+    assert calls == [("session", "owner", None, None, "123-0", attachments)]

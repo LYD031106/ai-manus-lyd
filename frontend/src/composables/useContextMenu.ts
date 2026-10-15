@@ -7,8 +7,6 @@ export interface MenuItem {
     variant?: 'default' | 'danger';
     checked?: boolean;
     disabled?: boolean;
-    /** Official nested popover submenu (e.g. Move to project) */
-    children?: MenuItem[];
     action?: (itemId: string) => void;
 }
 
@@ -60,8 +58,6 @@ export function useContextMenu() {
   // Handle menu item click (called from ContextMenu component)
   const handleMenuItemClick = (item: MenuItem) => {
     if (item.disabled) return;
-    // Parent rows with children open a submenu — do not dismiss
-    if (item.children?.length) return;
     
     if (selectedItemId.value) {
       // Call the provided handler
@@ -93,52 +89,33 @@ export function useContextMenu() {
   }
 }
 
-function markIcons(item: MenuItem): MenuItem {
-  return {
-    ...item,
-    icon: item.icon ? markRaw(item.icon) : item.icon,
-    children: item.children?.map(markIcons),
-  }
-}
-
 // Utility functions for creating common menu items
 export const createMenuItem = (
   key: string,
   label: string,
   options: Partial<Omit<MenuItem, 'key' | 'label'>> = {}
-): MenuItem => markIcons({
+): MenuItem => ({
   key,
   label,
   variant: 'default',
   ...options,
+  icon: options.icon ? markRaw(options.icon) : options.icon
 })
 
 export const createDangerMenuItem = (
   key: string,
   label: string,
   options: Partial<Omit<MenuItem, 'key' | 'label' | 'variant'>> = {}
-): MenuItem => markIcons({
+): MenuItem => ({
   key,
   label,
   variant: 'danger',
   ...options,
-})
-
-export const createSubmenuItem = (
-  key: string,
-  label: string,
-  children: MenuItem[],
-  options: Partial<Omit<MenuItem, 'key' | 'label' | 'children'>> = {}
-): MenuItem => markIcons({
-  key,
-  label,
-  variant: 'default',
-  children,
-  ...options,
+  icon: options.icon ? markRaw(options.icon) : options.icon
 })
 
 export const createSeparator = (): MenuItem => ({
-  key: `separator-${Math.random().toString(36).slice(2)}`,
+  key: 'separator',
   label: '',
   disabled: true,
-})
+}) 

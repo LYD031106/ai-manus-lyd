@@ -33,9 +33,8 @@
             :hideHeader="isConsecutiveAssistant(messages, index)"
             @toolClick="handleToolClick" />
 
-          <!-- Loading indicator: only before first visible replay output -->
-          <LoadingIndicator v-if="showThinking" :text="$t('{name} is thinking', { name: 'Manus' })" />
-          <div v-else-if="isLoading" aria-hidden="true" class="h-5 invisible" />
+          <!-- Loading indicator -->
+          <LoadingIndicator v-if="isLoading" :text="$t('Thinking')" />
         </div>
 
         <div class="sticky bottom-0 max-w-[800px] mx-auto w-full pb-3 flex flex-col gap-2 px-3 pt-2.5 sm:pt-0">
@@ -84,7 +83,7 @@
         </div>
       </div>
     </div>
-    <ComputerPanel ref="computerPanel" :sessionId="sessionId" :realTime="realTime"
+    <ComputerPanel ref="computerPanel" :size="computerPanelSize" :sessionId="sessionId" :realTime="realTime"
       :isShare="true" :toolHistory="toolHistory" :plan="plan"
       @jumpToRealTime="jumpToRealTime"
       @selectTool="handleSelectTool" />
@@ -98,7 +97,7 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ChatMessage from '../components/ChatMessage.vue';
 import * as agentApi from '../api/agent';
-import { Message, MessageContent, ToolContent, StepContent, AttachmentsContent, isConsecutiveAssistant } from '../types/message';
+import { Message, ToolContent, StepContent, isConsecutiveAssistant } from '../types/message';
 import { PlanEventData } from '../types/event';
 import { useAgentEvents } from '../composables/useAgentEvents';
 import ComputerPanel from '../components/ComputerPanel.vue'
@@ -122,6 +121,7 @@ const createInitialState = () => ({
   isLoading: false,
   sessionId: undefined as string | undefined,
   messages: [] as Message[],
+  computerPanelSize: 0,
   realTime: true,
   follow: true,
   title: t('New Chat'),
@@ -145,6 +145,7 @@ const {
   isLoading,
   sessionId,
   messages,
+  computerPanelSize,
   realTime,
   follow,
   title,
@@ -176,37 +177,9 @@ const toolHistory = computed(() => {
   return tools;
 });
 
-/** Replay: thinking only fills the gap before first visible turn output. */
-const showThinking = computed(() => {
-  if (!isLoading.value) return false;
-
-  let lastUserIdx = -1;
-  for (let i = messages.value.length - 1; i >= 0; i--) {
-    const m = messages.value[i];
-    if (m.type === 'user') {
-      lastUserIdx = i;
-      break;
-    }
-    if (m.type === 'attachments' && (m.content as AttachmentsContent).role === 'user') {
-      lastUserIdx = i;
-      break;
-    }
-  }
-
-  for (let i = lastUserIdx + 1; i < messages.value.length; i++) {
-    const m = messages.value[i];
-    if (m.type === 'tool' || m.type === 'step') return false;
-    if (m.type === 'assistant') {
-      const text = ((m.content as MessageContent).content || '').trim();
-      if (text) return false;
-    }
-  }
-  return true;
-});
-
-// Shared agent event -> message list conversion
+// Shared SSE event -> message list conversion
 const { handleEvent, replayEvents } = useAgentEvents(
-  { messages, title, plan, lastEventId, lastTool, lastNoMessageTool },
+  { messages, title, plan, isLoading, lastEventId, lastTool, lastNoMessageTool },
   {
     onToolActivity: (tool: ToolContent) => {
       if (realTime.value) {

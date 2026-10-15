@@ -13,8 +13,6 @@ export interface BaseContent {
 
 export interface MessageContent extends BaseContent {
   content: string;
-  /** User-turn attachments rendered above the text bubble (official ChatQuestion). */
-  attachments?: FileInfo[];
 }
 
 export interface ToolContent extends BaseContent {

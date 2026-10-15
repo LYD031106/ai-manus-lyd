@@ -49,7 +49,6 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import ErrorIcon from '@/components/icons/ErrorIcon.vue';
 import InfoIcon from '@/components/icons/InfoIcon.vue';
 import SuccessIcon from '@/components/icons/SuccessIcon.vue';
-import { eventBus } from '@/utils/eventBus';
 
 interface Toast {
   id: number;
@@ -85,16 +84,19 @@ const removeToast = (id: number) => {
   }
 };
 
-const handleToastEvent = (detail: { message: string; type: 'error' | 'info' | 'success'; duration: number }) => {
-  addToast(detail.message, detail.type, detail.duration);
+// Create custom event bus
+const handleToastEvent = (event: CustomEvent) => {
+  const { message, type, duration } = event.detail;
+  addToast(message, type, duration);
 };
 
+// Listen for custom events
 onMounted(() => {
-  eventBus.on('ui:toast', handleToastEvent);
+  window.addEventListener('toast', handleToastEvent as EventListener);
 });
 
 onUnmounted(() => {
-  eventBus.off('ui:toast', handleToastEvent);
+  window.removeEventListener('toast', handleToastEvent as EventListener);
 });
 
 // Expose methods for external use

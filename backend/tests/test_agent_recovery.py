@@ -424,3 +424,4 @@ async def test_summarize_question_waits_without_completing_plan_and_resumes():
     assert plan.status == ExecutionStatus.COMPLETED
     assert any(isinstance(event, MessageEvent) and event.message == "Finished report" for event in resumed_events)
     assert isinstance(resumed_events[-1], DoneEvent)
+

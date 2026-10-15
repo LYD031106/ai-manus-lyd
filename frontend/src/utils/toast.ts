@@ -2,7 +2,6 @@
  * Toast service
  * Provide global Toast message notification functionality
  */
-import { eventBus } from './eventBus'
 
 type ToastType = 'error' | 'info' | 'success';
 
@@ -25,11 +24,18 @@ export function showToast(options: ToastOptions | string): void {
     config = options;
   }
   
-  eventBus.emit('ui:toast', {
+  // Default configuration
+  const detail = {
     message: config.message,
     type: config.type || 'info',
-    duration: config.duration === undefined ? 3000 : config.duration,
-  });
+    duration: config.duration === undefined ? 3000 : config.duration
+  };
+  
+  // Create custom event
+  const event = new CustomEvent('toast', { detail });
+  
+  // Trigger event
+  window.dispatchEvent(event);
 }
 
 // Convenient methods
@@ -65,4 +71,4 @@ if (typeof window !== 'undefined') {
     info: showInfoToast,
     success: showSuccessToast
   };
-}
+} 

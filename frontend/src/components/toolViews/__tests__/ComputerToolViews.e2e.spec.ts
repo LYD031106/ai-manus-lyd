@@ -83,9 +83,9 @@ describe('Computer tool views e2e', () => {
     const modified = wrapper.findAll('button').find((b) => b.text() === 'Modified')
     expect(modified?.attributes('data-state')).toBe('on')
     expect(wrapper.get('pre').text()).toBe('new line')
-    await wrapper.findAll('button').find(b => b.text() === 'Original')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === 'Original')!.trigger('click')
     expect(wrapper.get('pre').text()).toBe('old line')
-    await wrapper.findAll('button').find(b => b.text() === 'Diff')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === 'Diff')!.trigger('click')
     expect(wrapper.findAll('pre').map(pre => pre.text())).toEqual(['old line', 'new line'])
     wrapper.unmount()
   })
@@ -107,6 +107,8 @@ describe('Computer tool views e2e', () => {
     const tabBar = wrapper.find('.backdrop-blur-3xl')
     expect(tabBar.exists()).toBe(true)
     expect(tabBar.element.parentElement?.classList.contains('hidden')).toBe(true)
+    expect(wrapper.get('pre').text()).toBe('only new')
+    wrapper.unmount()
   })
 
   it('ShellToolView mounts xterm host panel', async () => {

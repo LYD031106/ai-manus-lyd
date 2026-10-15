@@ -13,7 +13,6 @@ from app.domain.models.event import (
     ToolStatus,
     ErrorEvent,
     MessageEvent,
-    TerminalUpdateEvent,
 )
 from app.domain.repositories.agent_repository import AgentRepository
 from app.domain.external.llm import LLM
@@ -291,77 +290,10 @@ class BaseAgent(ABC):
                     )
 
                     await self._set_tool_state(tool_call_id, "running")
-                    # Official terminalUpdate: poll shell console while the tool runs
-                    shell_id = (
-                        function_args.get("id")
-                        if tool.toolkit.name == "shell" and isinstance(function_args, dict)
-                        else None
-                    )
-                    if shell_id and hasattr(tool.toolkit, "sandbox"):
-                        invoke_task = asyncio.create_task(self.invoke_tool(tool, tool_call))
-                        last_fingerprint: Optional[str] = None
-
-                        def _console_fingerprint(console: Any) -> str:
-                            """Cheap change detector — avoid repr() on large consoles."""
-                            if console is None:
-                                return "0:"
-                            if isinstance(console, str):
-                                return f"s:{len(console)}:{console[-80:]}"
-                            if isinstance(console, list):
-                                if not console:
-                                    return "0:"
-                                last = console[-1]
-                                if isinstance(last, dict):
-                                    tail = f"{last.get('command', '')}|{str(last.get('output', ''))[-60:]}"
-                                else:
-                                    tail = str(last)[-80:]
-                                return f"l:{len(console)}:{tail}"
-                            return f"o:{type(console).__name__}:{str(console)[-80:]}"
-
-                        try:
-                            while not invoke_task.done():
-                                done, _ = await asyncio.wait({invoke_task}, timeout=1.0)
-                                if done:
-                                    break
-                                try:
-                                    view = await tool.toolkit.sandbox.view_shell(
-                                        shell_id, console=True
-                                    )
-                                    console = (
-                                        view.data.get("console", [])
-                                        if view and getattr(view, "data", None)
-                                        else []
-                                    )
-                                    fingerprint = _console_fingerprint(console)
-                                    if fingerprint != last_fingerprint:
-                                        last_fingerprint = fingerprint
-                                        yield TerminalUpdateEvent(
-                                            shell_id=shell_id,
-                                            output=console,
-                                        )
-                                except Exception:
-                                    logger.debug(
-                                        "Shell live poll failed for %s",
-                                        shell_id,
-                                        exc_info=True,
-                                    )
-                            tool_result = await invoke_task
-                        finally:
-                            # Live updates can suspend this generator while a
-                            # tool is still running. Close its task before the
-                            # agent repairs history or processes new input.
-                            if not invoke_task.done():
-                                invoke_task.cancel()
-                            try:
-                                completed_result = await invoke_task
-                            except asyncio.CancelledError:
-                                pass
-                            else:
-                                await self._add_to_memory([completed_result])
-                    else:
-                        tool_result = await self.invoke_tool(tool, tool_call)
-                        # Results must survive event-rendering/delivery failures.
-                        await self._add_to_memory([tool_result])
+                    tool_result = await self.invoke_tool(tool, tool_call)
+                    # Results must survive failures/interruptions in event
+                    # rendering and delivery, and in later tools in this batch.
+                    await self._add_to_memory([tool_result])
 
                     # Generate event after tool call
                     yield ToolEvent(

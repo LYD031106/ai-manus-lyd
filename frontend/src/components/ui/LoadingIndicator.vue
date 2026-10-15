@@ -1,13 +1,12 @@
 <template>
-  <!-- Official Manus AgentIsTyping: text + 3 bounce dots -->
   <div class="flex items-center gap-1 text-[var(--text-tertiary)] text-sm">
     <span v-if="text">{{ text }}</span>
     <span class="flex gap-1 relative top-[4px]">
       <span
-        v-for="delay in delays"
-        :key="delay"
+        v-for="(_, index) in 3"
+        :key="index"
         class="w-[3px] h-[3px] rounded animate-bounce-dot bg-[var(--icon-tertiary)]"
-        :style="{ animationDelay: delay }"
+        :style="{ 'animation-delay': `${index * 200}ms` }"
       ></span>
     </span>
   </div>
@@ -21,8 +20,6 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   text: undefined
 })
-
-const delays = ['0ms', '200ms', '400ms'] as const
 </script>
 
 <style scoped>

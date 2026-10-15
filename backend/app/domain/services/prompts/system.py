@@ -18,7 +18,6 @@ import logging
 from pathlib import Path
 from typing import List, Optional
 
-from app.core.config import get_settings
 from app.domain.services.tools.base import BaseToolkit
 
 logger = logging.getLogger(__name__)
@@ -75,22 +74,12 @@ what you produce.
 - Code must be saved to a file before execution; never pipe code inline into
   interpreters.
 </operating_principles>
-""".strip()
 
-LIGHTWEIGHT_SANDBOX_ENVIRONMENT = """
 <sandbox_environment>
 - Lightweight Linux sandbox (linux/amd64)
 - User home and uploaded files are under `/home/ubuntu`
 - Python 3.11 is available for scripts and file processing
 - Browser, desktop/VNC, Node.js, and other heavyweight runtimes are not installed
-</sandbox_environment>
-""".strip()
-
-BROWSER_SANDBOX_ENVIRONMENT = """
-<sandbox_environment>
-- Ubuntu 22.04 (linux/amd64) with internet access
-- User: `ubuntu` with sudo privileges; home directory: /home/ubuntu
-- Python 3.10 (python3, pip3), Node.js 20 (node, npm), calculator (bc)
 </sandbox_environment>
 """.strip()
 
@@ -123,11 +112,7 @@ def build_system_prompt(
         project_instruction: Optional per-project guidance from
             ``Project.instruction``.
     """
-    environment = (
-        BROWSER_SANDBOX_ENVIRONMENT if get_settings().browser_enabled
-        else LIGHTWEIGHT_SANDBOX_ENVIRONMENT
-    )
-    sections = [CORE_PROMPT, environment]
+    sections = [CORE_PROMPT]
     if BUILTIN_SKILL_PROMPT:
         sections.append(BUILTIN_SKILL_PROMPT)
     for toolkit in toolkits or []:

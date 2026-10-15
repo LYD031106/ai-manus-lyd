@@ -7,8 +7,7 @@ const DEFAULT_REFRESH_INTERVAL_MS = 5000
  * Shared load + auto-refresh behavior for tool views (file, shell, ...).
  *
  * Loads content on mount and whenever the tool content changes; while `live`
- * is true and a target key is present, re-loads on a fixed interval — unless
- * `pushOnly` (official WS terminalUpdate / file_update drives the panel).
+ * is true and a target key is present, re-loads on a fixed interval.
  */
 export function useLiveToolContent(options: {
   toolContent: Ref<ToolContent>
@@ -17,18 +16,10 @@ export function useLiveToolContent(options: {
   targetKey: Ref<string>
   load: () => void | Promise<void>
   intervalMs?: number
-  /** When true, skip REST polling — rely on WS push + toolContent watches. */
-  pushOnly?: Ref<boolean> | boolean
 }) {
   const { toolContent, live, targetKey, load } = options
   const intervalMs = options.intervalMs ?? DEFAULT_REFRESH_INTERVAL_MS
   const refreshTimer = ref<number | null>(null)
-
-  const isPushOnly = () => {
-    const v = options.pushOnly
-    if (v == null) return false
-    return typeof v === 'boolean' ? v : v.value
-  }
 
   const stopAutoRefresh = () => {
     if (refreshTimer.value) {
@@ -39,7 +30,6 @@ export function useLiveToolContent(options: {
 
   const startAutoRefresh = () => {
     stopAutoRefresh()
-    if (isPushOnly()) return
     if (live.value && targetKey.value) {
       refreshTimer.value = window.setInterval(() => {
         load()

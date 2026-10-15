@@ -99,6 +99,8 @@ class DockerSandbox(Sandbox):
                 "name": container_name,
                 "detach": True,
                 "remove": True,
+                "security_opt": ["no-new-privileges:true"],
+                "cap_drop": ["ALL"],
                 "environment": {
                     "SERVICE_TIMEOUT_MINUTES": settings.sandbox_ttl_minutes,
                     "CHROME_ARGS": settings.sandbox_chrome_args,
@@ -107,12 +109,6 @@ class DockerSandbox(Sandbox):
                     "NO_PROXY": settings.sandbox_no_proxy
                 }
             }
-
-            # The lightweight image runs directly as its application user.
-            # The desktop image still needs supervisor user switching and sudo.
-            if not settings.browser_enabled:
-                container_config["security_opt"] = ["no-new-privileges:true"]
-                container_config["cap_drop"] = ["ALL"]
 
             if settings.sandbox_mem_limit:
                 container_config["mem_limit"] = settings.sandbox_mem_limit

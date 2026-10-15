@@ -10,7 +10,6 @@
       </div>
     </div>
   </div>
-  <TakeOverView v-if="browserEnabled" />
   <CustomDialog />
   <SessionFileList />
   <SettingsDialog />
@@ -18,14 +17,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue';
+import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import SessionSidebar from '@/components/SessionSidebar.vue';
 import CustomDialog from '@/components/ui/CustomDialog.vue';
 import ContextMenu from '@/components/ui/ContextMenu.vue';
-import { useCapabilities } from '@/composables/useCapabilities';
-const TakeOverView = defineAsyncComponent(() => import('@/components/TakeOverView.vue'));
-const { browserEnabled } = useCapabilities();
 import SessionFileList from '@/components/SessionFileList.vue';
 import FilePreviewer from '@/components/FilePreviewer.vue';
 import SettingsDialog from '@/components/settings/SettingsDialog.vue';

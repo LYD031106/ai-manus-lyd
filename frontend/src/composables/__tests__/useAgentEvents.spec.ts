@@ -1,62 +1,67 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref, watch } from 'vue'
 import { useAgentEvents, type AgentEventState } from '../useAgentEvents'
-import type { AgentEvent } from '../../types/event'
-import type { MessageContent, StepContent } from '../../types/message'
+import type { AgentSSEEvent } from '../../types/event'
+import type { Message, StepContent } from '../../types/message'
 
-const createState = (): AgentEventState => ({
-  messages: ref([]), title: ref('New chat'), plan: ref(), lastEventId: ref(),
-  lastTool: ref(), lastNoMessageTool: ref(),
+const makeState = (): AgentEventState => ({
+  messages: ref<Message[]>([]), title: ref('New Chat'), plan: ref(), isLoading: ref(true),
+  lastEventId: ref(), lastTool: ref(), lastNoMessageTool: ref(),
 })
-const events: AgentEvent[] = [
-  { event: 'message', data: { event_id: '1', timestamp: 1, role: 'user', content: '', attachments: [
-    { file_id: 'f', filename: 'data.txt', size: 10, content_type: 'text/plain', upload_date: '' },
-  ] } },
-  { event: 'step', data: { event_id: '2', timestamp: 2, id: 'step', status: 'running', description: 'Read file' } },
-  { event: 'tool', data: { event_id: '3', timestamp: 3, tool_call_id: 'call', name: 'file', function: 'file_read', args: { file: 'data.txt' }, status: 'calling' } },
-  { event: 'tool', data: { event_id: '4', timestamp: 4, tool_call_id: 'call', name: 'file', function: 'file_read', args: { file: 'data.txt' }, status: 'called', content: { content: 'hello' } } },
-  { event: 'step', data: { event_id: '5', timestamp: 5, id: 'step', status: 'failed', description: 'Read file' } },
-  { event: 'error', data: { event_id: '6', timestamp: 6, error: 'Earlier error' } },
-  { event: 'title', data: { event_id: '7', timestamp: 7, title: 'Attached file' } },
-]
+const step = (status: 'running' | 'failed'): AgentSSEEvent => ({
+  event: 'step', data: { event_id: status, timestamp: 1, id: 'step', description: 'Read file', status },
+})
+const tool = (status: 'calling' | 'called'): AgentSSEEvent => ({
+  event: 'tool', data: { event_id: status, timestamp: 2, tool_call_id: 'call', name: 'file', function: 'file_read', args: {}, status },
+})
 
-describe('history batch replay', () => {
-  it('matches live reduction, groups user attachments and publishes messages once', () => {
-    const live = createState()
-    const replay = createState()
-    const liveReducer = useAgentEvents(live)
-    events.forEach(liveReducer.handleEvent)
-    const publish = vi.fn()
-    const stop = watch(replay.messages, publish, { deep: true, flush: 'sync' })
+describe('agent history batch replay', () => {
+  it('publishes one message batch and does not open tool panels for history', () => {
+    const state = makeState()
     const onToolActivity = vi.fn()
-    const onStreamError = vi.fn()
-    const reducer = useAgentEvents(replay, { onToolActivity, onStreamError })
-    reducer.replayEvents(events)
-    expect(replay.messages.value).toEqual(live.messages.value)
+    const publish = vi.fn()
+    const stop = watch(state.messages, publish, { deep: true, flush: 'sync' })
+    const events = useAgentEvents(state, { onToolActivity })
+    events.replayEvents([step('running'), tool('calling'), tool('called'), step('failed')])
     expect(publish).toHaveBeenCalledTimes(1)
     expect(onToolActivity).not.toHaveBeenCalled()
-    expect(onStreamError).not.toHaveBeenCalled()
-    expect((replay.messages.value[0].content as MessageContent).attachments).toHaveLength(1)
-    expect((replay.messages.value[1].content as StepContent).tools).toHaveLength(1)
-    expect((replay.messages.value[1].content as StepContent).status).toBe('failed')
-    expect(replay.lastTool.value?.status).toBe('called')
-    expect(replay.lastEventId.value).toBe('7')
-    expect(replay.title.value).toBe('Attached file')
-    reducer.handleEvent(events[2])
+    const content = state.messages.value[0].content as StepContent
+    expect(content.status).toBe('failed')
+    expect(content.tools).toHaveLength(1)
+    expect(content.tools[0].status).toBe('called')
+    expect(state.isLoading.value).toBe(false)
+    expect(state.lastEventId.value).toBe('failed')
+    events.handleEvent(tool('called'))
     expect(onToolActivity).toHaveBeenCalledTimes(1)
     stop()
   })
 
-  it('replaces old history without stale tools and ignores live computer control events', () => {
-    const state = createState()
-    const reducer = useAgentEvents(state)
-    reducer.replayEvents(events)
-    reducer.replayEvents([events[0]])
-    expect(state.messages.value).toHaveLength(1)
+  it('replaces old tool, plan, and cursor state without mutating prior objects', () => {
+    const state = makeState()
+    const events = useAgentEvents(state)
+    events.handleEvent(tool('calling'))
+    const previousTool = state.lastTool.value
+    state.plan.value = { event_id: 'plan', timestamp: 1, steps: [] }
+    events.replayEvents([tool('called')])
+    expect(previousTool?.status).toBe('calling')
+    expect(state.lastTool.value?.status).toBe('called')
+    expect(state.plan.value).toBeUndefined()
+    events.replayEvents([])
+    expect(state.messages.value).toEqual([])
     expect(state.lastTool.value).toBeUndefined()
     expect(state.lastNoMessageTool.value).toBeUndefined()
-    reducer.handleEvent({ event: 'terminal_update', data: { event_id: 'ignored', timestamp: 9, shell_id: 's', output: 'new' } })
-    expect(state.messages.value).toHaveLength(1)
-    expect(state.lastEventId.value).toBe('1')
+    expect(state.lastEventId.value).toBeUndefined()
+  })
+
+  it('retains source attachment messages and SSE loading semantics', () => {
+    const state = makeState()
+    const file = { file_id: 'file', filename: 'data.txt', size: 1, content_type: 'text/plain', upload_date: '' }
+    useAgentEvents(state).replayEvents([
+      { event: 'message', data: { event_id: 'user', timestamp: 1, role: 'user', content: 'Read file', attachments: [file] } },
+      { event: 'done', data: { event_id: 'done', timestamp: 2 } },
+    ])
+    expect(state.messages.value.map(message => message.type)).toEqual(['user', 'attachments'])
+    // The SSE close callback, not a replayed done event, clears loading.
+    expect(state.isLoading.value).toBe(true)
   })
 })

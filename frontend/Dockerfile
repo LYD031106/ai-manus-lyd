@@ -5,7 +5,8 @@ FROM node:22-alpine as build-stage
 WORKDIR /app
 
 # Keep builds safe on small production hosts.
-ENV NODE_OPTIONS=--max-old-space-size=768
+ARG NODE_MAX_OLD_SPACE_SIZE=768
+ENV NODE_OPTIONS=--max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}
 
 # Copy package.json and package-lock.json files
 COPY package*.json ./

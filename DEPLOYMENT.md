@@ -1,6 +1,6 @@
 # AI Manus 远程 Docker 部署
 
-本项目的正式部署方式是：服务器直接从 GitHub 拉取代码，服务器本地构建 Docker 镜像，服务器本地使用 Docker Compose 启动。Windows 本地电脑只负责 SSH 连接，不上传源码、不运行项目、不执行 Docker 构建。
+本项目的正式部署方式是：服务器从 GitHub 拉取代码并使用 Docker Compose 启动。Backend 和 Sandbox 在服务器串行构建；约 2 GiB 内存的服务器优先接收本机编译的 Frontend `dist` 运行时包，避免在生产服务旁运行 Node 编译。前端产物必须来自本次部署的同一提交。
 
 详细的日常运维、备份、故障排查见 [Docker 运维手册](docs/operations-docker-zh.md)。
 
@@ -18,7 +18,9 @@ https://github.com/LYD031106/ai-manus-lyd.git
 main
 ~~~
 
-`codex/lightweight-sandbox` 的轻量沙箱、S-127、法规解析和历史优化特性已整合到 `main`；此后正式部署从 `main` 更新。
+`main` 以 `codex/lightweight-sandbox` 的最终版本 `b5db67e` 为产品基线，叠加后续修复；部署继续使用轻量沙箱和 SSE 会话流。
+
+修复先在 `codex/lightweight-sandbox` 完成并验证，再同步到 `main`；两分支保持相同发布代码，正式部署从 `main` 更新。
 
 远程服务器源码目录示例：
 
@@ -49,7 +51,7 @@ manus-mongodb-data
 
 ## 2. 首次部署
 
-以下命令全部在远程服务器执行。
+以下命令除明确说明的本机前端编译外，均在远程服务器执行。
 
 ### 2.1 安装并检查依赖
 
@@ -143,33 +145,48 @@ export BASE_IMAGE=simpleyyt/manus-backend:latest
 
 ### 2.5 在服务器构建 Backend 和 Sandbox
 
-构建上下文必须是仓库根目录：
+构建上下文必须是仓库根目录。构建与集成测试必须串行，前一个进程及其容器完全退出后再启动下一个。约 2 GiB 内存的主机先确认 `free -h` 有余量，且 `vmstat 1 5` 没有持续大量换页；2 GiB Swap 不代表可以同时运行多个构建或数据库测试。
 
 ~~~bash
 cd "$APP_DIR"
 
 DOCKER_BUILDKIT=0 docker build \
+  --memory=512m --memory-swap=768m \
+  --cpu-period=100000 --cpu-quota=50000 \
   --build-arg BACKEND_BASE_IMAGE="$BASE_IMAGE" \
   -f backend/Dockerfile.lightweight \
   -t local/manus-backend-lightweight:latest \
   .
 
 DOCKER_BUILDKIT=0 docker build \
+  --memory=512m --memory-swap=768m \
+  --cpu-period=100000 --cpu-quota=50000 \
   -f sandbox/Dockerfile.lightweight \
   -t local/manus-sandbox-lightweight:latest \
   .
 ~~~
 
+上述限额适用于仍支持 classic builder 的 Docker：`--memory-swap=768m` 是内存与 Swap 的总上限，CPU 配额为半核。使用 BuildKit 时需单独配置有资源限制的 builder，不能把 classic builder 参数当作已生效的 BuildKit 限额。限额下构建失败时先把该构建移到有余量的机器，不与生产服务争抢内存。
+
 Sandbox 镜像包含 Python、openpyxl、PDF/Word 依赖和 S-127 GML Skill。
 
-前端代码发生变化时才重新构建 Frontend：
+前端代码发生变化时才重新构建 Frontend。小内存服务器优先在本机使用锁定依赖执行 `npm ci`、检查和 `npm run build`，再打包 `dist`、`nginx.conf`、`docker-entrypoint.sh` 与仅复制这些文件的 Nginx 运行时 Dockerfile；包中不放 `.env`、源码依赖目录或凭据。服务器核对提交号及包校验和后，只构建该运行时镜像。
+
+如果确认服务器有足够余量并选择在服务器完整编译，通过构建参数把 Node 堆上限设为 320 MiB，再使用限额串行构建：
 
 ~~~bash
 DOCKER_BUILDKIT=0 docker build \
+  --memory=512m --memory-swap=768m \
+  --cpu-period=100000 --cpu-quota=50000 \
+  --build-arg NODE_MAX_OLD_SPACE_SIZE=320 \
   -f frontend/Dockerfile \
   -t local/manus-frontend-lightweight:latest \
   frontend
 ~~~
+
+`NODE_OPTIONS` 只限制 Node 堆，不是进程或构建的总内存上限。构建期间不要并行运行 Mongo 大事件集成测试或启动额外测试容器；验证留到构建结束、内存压力恢复之后。
+
+如果出现 SSH banner 和 API 同时超时，先停止新任务并只保留一次 SSH 重连。拿到 shell 后按完整命令和容器 ID 确认残留构建、测试进程，先终止这些新增负载；不要停止生产 Mongo、Redis 或清空数据卷。关闭本机 SSH 不保证远端 Docker 构建或测试容器已停止，`docker run --rm` 也只有在容器退出后才删除。确认换页恢复后再串行继续。
 
 ### 2.6 启动服务
 
@@ -209,7 +226,7 @@ cp "$APP_DIR/.env" /opt/ai-manus.env.backup.$(date +%Y%m%d-%H%M%S)
 ~~~bash
 cd "$APP_DIR"
 git status --short
-git fetch origin "$BRANCH"
+git fetch origin "$BRANCH:refs/remotes/origin/$BRANCH"
 git switch "$BRANCH"
 git pull --ff-only origin "$BRANCH"
 git rev-parse --short HEAD
@@ -217,18 +234,22 @@ git rev-parse --short HEAD
 
 服务器本地有未提交修改时，不要直接覆盖；先保存或确认这些修改不再需要。
 
-重新构建变化的镜像：
+重新构建变化的镜像，继续遵守上面的串行构建与资源限额：
 
 ~~~bash
 cd "$APP_DIR"
 
 DOCKER_BUILDKIT=0 docker build \
+  --memory=512m --memory-swap=768m \
+  --cpu-period=100000 --cpu-quota=50000 \
   --build-arg BACKEND_BASE_IMAGE="$BASE_IMAGE" \
   -f backend/Dockerfile.lightweight \
   -t local/manus-backend-lightweight:latest \
   .
 
 DOCKER_BUILDKIT=0 docker build \
+  --memory=512m --memory-swap=768m \
+  --cpu-period=100000 --cpu-quota=50000 \
   -f sandbox/Dockerfile.lightweight \
   -t local/manus-sandbox-lightweight:latest \
   .
@@ -281,7 +302,7 @@ docker run --rm \
 
 至少手工验证登录、新建对话、文件上传、Sandbox Python 执行和 PDF/Office 处理。
 
-`backend/scripts/verify_main_release.py` 可通过真实 HTTP / WebSocket 检查配置管理员登录、刷新、历史读取。指定 `--run-task` 后，还会上传独立测试附件、仅以附件发起短任务，核对模型调用沙箱的实际标准输出、实时状态和历史回读；结束后清理测试会话与上传。需在 Backend 环境中运行并指定持久路径 `--log-file`，日志不输出凭据。脚本不接受将密钥写入命令行的方式。
+`backend/scripts/verify_main_release.py` 使用本分支的 JWT / Bearer 与 HTTP / SSE 接口验证登录、`refresh_token` 刷新、历史读取及 `POST /sessions` 会话列表流。指定 `--run-task` 后，脚本上传独立测试附件，以仅附件输入发起一个真实模型短任务，核验实际 Shell 标准输出、REST Shell 回读、最终 `completed` 状态和持久化历史；随后以空消息和历史 UUID 事件 ID 恢复 SSE，检查没有新增历史或重跑任务。最后分别清理测试会话、上传文件并注销登录。脚本需在 Backend 环境运行，指定持久路径 `--log-file`；日志不打印凭据。真实模型任务会调用配置的模型服务，必须在镜像构建结束、主机资源恢复后串行执行。
 
 ## 5. 回滚
 

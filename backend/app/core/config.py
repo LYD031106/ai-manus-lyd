@@ -60,11 +60,9 @@ class Settings(BaseSettings):
     sandbox_https_proxy: str | None = None
     sandbox_http_proxy: str | None = None
     sandbox_no_proxy: str | None = None
-    # Lightweight deployments set explicit budgets; browser deployments retain
-    # their existing container defaults when these options are omitted.
-    sandbox_mem_limit: str | None = None
-    sandbox_nano_cpus: int | None = None
-    sandbox_pids_limit: int | None = None
+    sandbox_mem_limit: str | None = "256m"
+    sandbox_nano_cpus: int | None = 500_000_000
+    sandbox_pids_limit: int | None = 64
 
     # Browser engine configuration
     browser_enabled: bool = True
@@ -112,20 +110,11 @@ class Settings(BaseSettings):
     email_password: str | None = None
     email_from: str | None = None
     
-    # JWT configuration (URL signing + optional login grace for legacy tokens)
+    # JWT configuration
     jwt_secret_key: str = "your-secret-key-here"  # Should be set in production
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
-
-    # Opaque Redis auth sessions (browser Cookie + App Bearer)
-    session_cookie_name: str = "session_id"
-    session_web_ttl_days: int = 14
-    session_app_ttl_days: int = 30
-    session_cookie_secure: bool = False  # set True behind HTTPS
-    session_cookie_samesite: str = "lax"  # lax | strict | none
-    # Accept legacy JWT access tokens during migration; new logins issue Redis sessions
-    session_jwt_grace_enabled: bool = True
     
     # Extra headers for LLM requests (parsed from EXTRA_HEADERS env var, JSON)
     extra_headers: dict | None = None

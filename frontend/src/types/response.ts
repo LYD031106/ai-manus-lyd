@@ -1,4 +1,4 @@
-import { AgentEvent } from "./event";
+import { AgentSSEEvent } from "./event";
 
 export enum SessionStatus {
     PENDING = "pending",
@@ -15,11 +15,8 @@ export interface GetSessionResponse {
     session_id: string;
     title: string | null;
     status: SessionStatus;
-    events: AgentEvent[];
+    events: AgentSSEEvent[];
     is_shared: boolean;
-    is_favorite: boolean;
-    is_pinned: boolean;
-    project_id: string | null;
     task_mode: 'agent' | 'chat';
 }
 
@@ -32,7 +29,6 @@ export interface ListSessionItem {
     unread_message_count: number;
     is_shared: boolean;
     is_favorite: boolean;
-    is_pinned: boolean;
     project_id: string | null;
     task_mode?: 'agent' | 'chat';
 }
@@ -103,7 +99,7 @@ export interface SharedSessionResponse {
     session_id: string;
     title: string | null;
     status: SessionStatus;
-    events: AgentEvent[];
+    events: AgentSSEEvent[];
     is_shared: boolean;
 }
   

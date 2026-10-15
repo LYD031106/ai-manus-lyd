@@ -1,17 +1,12 @@
 // Backend API service
-import { apiClient, ApiResponse, BASE_URL } from './client';
-import { AgentEvent } from '../types/event';
-import type { AgentStatus } from '../types/event';
-import { CreateSessionResponse, GetSessionResponse, ShellViewResponse, FileViewResponse, ListSessionResponse, ListSessionItem, ShareSessionResponse, SharedSessionResponse } from '../types/response';
+import { apiClient, API_CONFIG, ApiResponse, createSSEConnection, SSECallbacks } from './client';
+import { AgentSSEEvent } from '../types/event';
+import { CreateSessionResponse, GetSessionResponse, ShellViewResponse, FileViewResponse, ListSessionResponse, SignedUrlResponse, ShareSessionResponse, SharedSessionResponse } from '../types/response';
 import type { FileInfo } from './file';
 
-export type ChatStreamCallbacks = {
-  onOpen?: () => void;
-  onMessage?: (event: { event: string; data: AgentEvent['data'] }) => void;
-  onStatusUpdate?: (agentStatus: AgentStatus) => void;
-  onClose?: () => void;
-  onError?: (error: Error) => void;
-};/**
+
+
+/**
  * Create Session
  * @returns Session
  */
@@ -30,70 +25,14 @@ export async function getSessions(): Promise<ListSessionResponse> {
   return response.data.data;
 }
 
-/** Session list realtime WS. */
-export type SessionsListWSMessage =
-  | { op: 'snapshot'; sessions: ListSessionItem[] }
-  | { op: 'upsert'; session: ListSessionItem }
-  | { op: 'remove'; session_id: string }
-  | { op: 'ping' };
-
-export function connectSessionsListWS(handlers: {
-  onMessage: (msg: SessionsListWSMessage) => void;
-  onError?: (error: Event) => void;
-  onClose?: () => void;
-}): () => void {
-  const wsBase = BASE_URL.replace(/^http/, 'ws');
-  // Browser Cookie auth (B1); no ?token=
-  const url = `${wsBase}/ws/sessions`;
-  let closed = false;
-  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  let reconnectDelay = 1000;
-  let ws: WebSocket | null = null;
-
-  const clearTimer = () => {
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-  };
-
-  const connect = () => {
-    if (closed) return;
-    ws = new WebSocket(url);
-    ws.onopen = () => {
-      reconnectDelay = 1000;
-    };
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data) as SessionsListWSMessage;
-        if (msg.op === 'ping') return;
-        handlers.onMessage(msg);
-      } catch (e) {
-        console.error('Failed to parse sessions WS message', e);
-      }
-    };
-    ws.onerror = (err) => {
-      handlers.onError?.(err);
-    };
-    ws.onclose = () => {
-      handlers.onClose?.();
-      if (closed) return;
-      clearTimer();
-      reconnectTimer = setTimeout(() => {
-        reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-        connect();
-      }, reconnectDelay);
-    };
-  };
-
-  connect();
-
-  return () => {
-    closed = true;
-    clearTimer();
-    ws?.close();
-    ws = null;
-  };
+export async function getSessionsSSE(callbacks?: SSECallbacks<ListSessionResponse>): Promise<() => void> {
+  return createSSEConnection<ListSessionResponse>(
+    '/sessions',
+    {
+      method: 'POST'
+    },
+    callbacks
+  );
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {
@@ -104,17 +43,6 @@ export async function updateSessionTitle(sessionId: string, title: string): Prom
   const response = await apiClient.patch<ApiResponse<{ session_id: string; title: string }>>(
     `/sessions/${sessionId}/title`,
     { title }
-  );
-  return response.data.data;
-}
-
-export async function updateSessionTaskMode(
-  sessionId: string,
-  taskMode: 'agent' | 'chat',
-): Promise<{ session_id: string; task_mode: 'agent' | 'chat' }> {
-  const response = await apiClient.patch<ApiResponse<{ session_id: string; task_mode: 'agent' | 'chat' }>>(
-    `/sessions/${sessionId}/mode`,
-    { task_mode: taskMode },
   );
   return response.data.data;
 }
@@ -133,14 +61,6 @@ export async function unfavoriteSession(sessionId: string): Promise<{ session_id
   return response.data.data;
 }
 
-export async function pinSession(sessionId: string, isPinned: boolean): Promise<{ session_id: string; is_pinned: boolean }> {
-  const response = await apiClient.post<ApiResponse<{ session_id: string; is_pinned: boolean }>>(
-    `/sessions/${sessionId}/pin`,
-    { is_pinned: isPinned }
-  );
-  return response.data.data;
-}
-
 export async function moveSessionProject(
   sessionId: string,
   projectId: string | null
@@ -153,21 +73,41 @@ export async function moveSessionProject(
 }
 
 export async function stopSession(sessionId: string): Promise<void> {
-  try {
-    const { getChatWebSocket } = await import('./chatWs');
-    await getChatWebSocket().stopSession(sessionId);
-  } catch {
-    await apiClient.post<ApiResponse<void>>(`/sessions/${sessionId}/stop`);
-  }
+  await apiClient.post<ApiResponse<void>>(`/sessions/${sessionId}/stop`);
 }
 
 /**
- * VNC WebSocket URL — Cookie / Bearer auth (same as /ws/*). No signed URL.
+ * Create VNC signed URL
+ * @param sessionId Session ID to create signed URL for
+ * @param expireMinutes URL expiration time in minutes (default: 15)
+ * @returns Signed URL response for VNC WebSocket access
  */
-export const getVNCUrl = (sessionId: string): string => {
-  const wsBase = BASE_URL.replace(/^http/, 'ws');
-  return `${wsBase}/ws/vnc/${sessionId}`;
-};
+export async function createVncSignedUrl(sessionId: string, expireMinutes: number = 15): Promise<SignedUrlResponse> {
+  const response = await apiClient.post<ApiResponse<SignedUrlResponse>>(`/sessions/${sessionId}/vnc/signed-url`, {
+    expire_minutes: expireMinutes
+  });
+  return response.data.data;
+}
+
+/**
+ * Get VNC WebSocket URL with signed URL
+ * @param sessionId Session ID
+ * @param expireMinutes URL expiration time in minutes (default: 60)
+ * @returns Promise resolving to signed VNC WebSocket URL string
+ * 
+ * @example
+ * // Signed URL (no Authorization header needed, more secure)
+ * const url = await getVNCUrl('session123');
+ * const url = await getVNCUrl('session123', 120);
+ */
+export const getVNCUrl = async (
+  sessionId: string, 
+  expireMinutes: number = 15
+): Promise<string> => {
+    const signedUrlResponse = await createVncSignedUrl(sessionId, expireMinutes);
+    const wsBaseUrl = API_CONFIG.host.replace(/^http/, 'ws');
+    return `${wsBaseUrl}${signedUrlResponse.signed_url}`;
+}
 
 /**
  * File attachment reference sent with a chat request.
@@ -179,59 +119,30 @@ export interface ChatAttachment {
 }
 
 /**
- * Chat with Session over persistent chat WS (join/leave).
- * Returns a cancel function that clears handlers for this call (does not close WS).
+ * Chat with Session (using SSE to receive streaming responses)
+ * @returns A function to cancel the SSE connection
  */
 export const chatWithSession = async (
-  sessionId: string,
+  sessionId: string, 
   message: string = '',
   eventId?: string,
   attachments?: ChatAttachment[],
-  callbacks?: ChatStreamCallbacks
+  callbacks?: SSECallbacks<AgentSSEEvent['data']>
 ): Promise<() => void> => {
-  const { getChatWebSocket } = await import('./chatWs');
-  const ws = getChatWebSocket();
-
-  const clearHandlers = ws.setHandlers(sessionId, {
-    onOpen: () => callbacks?.onOpen?.(),
-    onEvent: ({ event, data }) => {
-      // status_update is delivered via onStatusUpdate; skip duplicate onMessage
-      if (event === 'status_update') return;
-      callbacks?.onMessage?.({ event, data: data as AgentEvent['data'] });
+  return createSSEConnection<AgentSSEEvent['data']>(
+    `/sessions/${sessionId}/chat`,
+    {
+      method: 'POST',
+      body: { 
+        message, 
+        timestamp: Math.floor(Date.now() / 1000), 
+        event_id: eventId,
+        attachments
+      }
     },
-    onStatusUpdate: (agentStatus) => {
-      callbacks?.onStatusUpdate?.(agentStatus);
-    },
-    onStreamEnd: () => {
-      callbacks?.onClose?.();
-    },
-    onError: (error) => {
-      callbacks?.onError?.(new Error(error));
-    },
-  });
-
-  if (message || (attachments && attachments.length > 0)) {
-    await ws.chat({
-      sessionId,
-      message,
-      lastEventId: eventId,
-      attachments,
-    });
-  } else {
-    // Resume / catch-up stream for running session
-    await ws.joinSession(sessionId, eventId);
-  }
-
-  return clearHandlers;
+    callbacks
+  );
 };
-
-/** Leave chat session subscription (switch away). */
-export async function leaveChatSession(sessionId: string): Promise<void> {
-  const { getChatWebSocket } = await import('./chatWs');
-  const ws = getChatWebSocket();
-  ws.clearHandlers(sessionId);
-  await ws.leaveSession(sessionId);
-}
 
 /**
  * View Shell session output

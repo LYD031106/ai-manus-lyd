@@ -81,21 +81,6 @@
           </div>
         </div>
 
-        <!-- Claw (product-specific) -->
-        <div
-          v-if="clawEnabled"
-          @click="handleClawClick"
-          :title="isSessionSidebarShow ? undefined : 'Manus Claw'"
-          class="flex items-center rounded-[10px] clickable cursor-pointer transition-colors w-full gap-[8px] h-[36px] pointer-events-auto ps-[8px] pe-[2px]"
-          :class="route.path === '/chat/claw' ? 'bg-[var(--fill-tsp-white-main)]' : 'hover:bg-[var(--fill-tsp-white-light)]'">
-          <div class="shrink-0 size-[20px] flex items-center justify-center">
-            <div class="claw-nav-icon w-[18px] h-[18px]" />
-          </div>
-          <div v-if="isSessionSidebarShow" class="flex-1 min-w-0 flex gap-[4px] items-center text-[14px] text-[var(--text-primary)]">
-            <span class="truncate">Manus Claw</span>
-          </div>
-        </div>
-
         <!-- Scroll: Projects + Tasks -->
         <div v-if="isSessionSidebarShow" class="flex flex-col flex-1 min-h-0 -mx-[8px] overflow-hidden">
           <div
@@ -107,109 +92,7 @@
             class="relative flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-5 px-[8px]"
             @scroll="handleListScroll">
 
-            <!-- Official: Pinned (已固定) — pinned projects leave Projects list -->
-            <div
-              v-if="pinnedProjects.length > 0"
-              class="flex flex-col gap-px bg-[var(--background-nav)]">
-              <div
-                class="group flex items-center justify-between ps-[10px] pe-[2px] py-[2px] h-[36px] gap-[12px] clickable sticky top-0 z-[3] bg-[var(--background-nav)] cursor-pointer"
-                @click="pinnedCollapsed = !pinnedCollapsed">
-                <div class="absolute inset-0 rounded-[10px] opacity-0 group-hover:opacity-100 group-hover:bg-[var(--fill-tsp-white-light)] group-active:opacity-100 bg-[var(--fill-tsp-white-dark)] transition-opacity pointer-events-none" />
-                <div class="flex items-center flex-1 min-w-0 gap-0.5">
-                  <span class="text-[13px] leading-[18px] text-[var(--text-tertiary)] font-medium min-w-0 truncate tracking-[-0.091px]">
-                    {{ t('Pinned') }}
-                  </span>
-                  <ChevronUp
-                    :size="14"
-                    class="transition-transform shrink-0 opacity-0 group-hover:opacity-100"
-                    :class="pinnedCollapsed ? '' : 'rotate-180'"
-                    stroke="var(--icon-tertiary)" />
-                </div>
-                <div class="flex items-center justify-center">
-                  <div />
-                </div>
-              </div>
-
-              <div v-if="!pinnedCollapsed" class="flex flex-col w-full gap-px">
-                <div
-                  v-for="project in pinnedProjects"
-                  :key="`pinned-${project.project_id}`"
-                  class="flex flex-col gap-px">
-                  <div
-                    class="nav-bar-project-item-header w-full flex items-center overflow-hidden h-[36px] ps-[8px] pe-[2px] gap-[12px] sticky top-[36px] z-[1] bg-[var(--background-nav)] clickable group cursor-pointer"
-                    :class="isActiveProject(project.project_id)
-                      ? 'rounded-[10px] shadow-[inset_0_0_0_100px_var(--fill-tsp-white-main)]'
-                      : 'hover:rounded-[10px] hover:shadow-[inset_0_0_0_100px_var(--fill-tsp-white-light)]'"
-                    @click="openProject(project.project_id)">
-                    <div class="flex flex-1 items-center gap-[8px] min-w-0">
-                      <div class="flex items-center justify-center relative size-[20px] flex-shrink-0 group/icon">
-                        <div
-                          class="absolute inset-0 flex items-center justify-center group-hover:invisible"
-                          :class="expandedProjectIds.has(project.project_id) ? 'invisible' : 'visible'">
-                          <Folder :size="18" class="text-[var(--icon-primary)]" stroke="var(--icon-primary)" />
-                        </div>
-                        <div
-                          class="absolute inset-0 flex items-center justify-center rounded-[8px] hover:bg-[var(--fill-tsp-white-light)] clickable invisible group-hover:visible"
-                          :class="expandedProjectIds.has(project.project_id) ? '!visible' : ''"
-                          :title="expandedProjectIds.has(project.project_id) ? t('Collapse') : t('Expand')"
-                          @click.stop="toggleProjectExpand(project.project_id)">
-                          <ChevronRight
-                            :size="18"
-                            class="text-[var(--icon-tertiary)] transition-transform duration-200"
-                            :class="expandedProjectIds.has(project.project_id) ? 'rotate-90' : 'rotate-0'"
-                          />
-                        </div>
-                      </div>
-                      <span
-                        class="text-[var(--text-primary)] text-sm truncate"
-                        :title="project.name">
-                        {{ project.name || t('Untitled') }}
-                      </span>
-                    </div>
-                    <div class="flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100">
-                      <!-- Official: … menu (pin/edit/view/delete) + SquarePen shortcut -->
-                      <button
-                        type="button"
-                        class="size-[32px] flex rounded-[8px] items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-white-light)] text-[var(--icon-tertiary)]"
-                        :title="t('More options')"
-                        @click.stop="handleProjectMenuClick($event, project)">
-                        <Ellipsis :size="18" />
-                      </button>
-                      <button
-                        type="button"
-                        class="size-[32px] flex rounded-[8px] items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-white-light)] text-[var(--icon-tertiary)]"
-                        :title="t('Edit')"
-                        @click.stop="handleEditProject(project)">
-                        <SquarePen :size="16" />
-                      </button>
-                    </div>
-                  </div>
-                  <div
-                    v-if="expandedProjectIds.has(project.project_id)"
-                    class="flex flex-col gap-[4px] overflow-hidden w-full">
-                    <SessionItem
-                      v-for="session in sessionsForProject(project.project_id)"
-                      :key="session.session_id"
-                      :session="session"
-                      :projects="projects"
-                      row-class="!ps-[24px]"
-                      @deleted="handleSessionDeleted"
-                      @renamed="handleSessionRenamed"
-                      @shared="handleSessionShared"
-                      @favorited="handleSessionFavorited"
-                      @pinned="handleSessionPinned"
-                      @moved="handleSessionMoved" />
-                    <div
-                      v-if="sessionsForProject(project.project_id).length === 0"
-                      class="flex items-center ps-[36px] pe-[8px] h-[36px]">
-                      <span class="text-[var(--text-disable)] text-sm">{{ t('No tasks yet') }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Projects — official unpinnedProjects only -->
+            <!-- Projects — official yw + yb (1whdjijd45ufa.js) -->
               <div
                 class="group flex items-center justify-between ps-[10px] pe-[2px] py-[2px] h-[36px] gap-[12px] clickable sticky top-0 z-[3] bg-[var(--background-nav)] cursor-pointer"
                 @click="projectsCollapsed = !projectsCollapsed">
@@ -235,16 +118,14 @@
 
               <div v-if="!projectsCollapsed" class="flex flex-col w-full gap-px">
                 <div
-                  v-if="unpinnedProjects.length === 0"
-                  class="w-full flex items-center rounded-[10px] h-[36px] ps-[8px] pe-[8px] gap-[8px] hover:bg-[var(--fill-tsp-white-light)] clickable cursor-pointer"
+                  v-if="projects.length === 0"
+                  class="w-full flex items-center rounded-[10px] h-[36px] ps-[10px] pe-[8px] gap-[8px] hover:bg-[var(--fill-tsp-white-light)] clickable cursor-pointer"
                   @click="handleNewProjectClick">
-                  <div class="flex size-[20px] shrink-0 items-center justify-center">
-                    <FolderPlus :size="18" class="text-[var(--icon-primary)]" />
-                  </div>
-                  <span class="text-[var(--text-primary)] text-sm">{{ t('New project') }}</span>
+                  <FolderPlus :size="18" class="shrink-0 text-[var(--icon-primary)]" />
+                  <span class="text-[var(--text-primary)] text-sm truncate">{{ t('New project') }}</span>
                 </div>
 
-                <template v-for="project in unpinnedProjects" :key="project.project_id">
+                <template v-for="project in projects" :key="project.project_id">
                   <!-- Official nav-bar-project-item-header -->
                   <div
                     class="nav-bar-project-item-header w-full flex items-center overflow-hidden h-[36px] ps-[8px] pe-[2px] gap-[12px] clickable group cursor-pointer"
@@ -278,21 +159,19 @@
                         {{ project.name || t('Untitled') }}
                       </span>
                     </div>
-                    <div class="flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100">
-                      <!-- Official: … menu (pin/edit/view/delete) + SquarePen shortcut -->
+                    <div class="flex items-center flex-shrink-0">
+                      <Pin
+                        v-if="project.is_pinned"
+                        :size="12"
+                        class="flex size-[32px] flex-shrink-0 items-center justify-center p-[10px] text-[var(--icon-tertiary)] group-hover:hidden"
+                        fill="var(--icon-tertiary)"
+                      />
                       <button
                         type="button"
-                        class="size-[32px] flex rounded-[8px] items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-white-light)] text-[var(--icon-tertiary)]"
-                        :title="t('More options')"
-                        @click.stop="handleProjectMenuClick($event, project)">
-                        <Ellipsis :size="18" />
-                      </button>
-                      <button
-                        type="button"
-                        class="size-[32px] flex rounded-[8px] items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-white-light)] text-[var(--icon-tertiary)]"
-                        :title="t('Edit')"
-                        @click.stop="handleEditProject(project)">
-                        <SquarePen :size="16" />
+                        class="hidden group-hover:flex size-[32px] rounded-[8px] items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-white-light)] text-[var(--icon-tertiary)]"
+                        :title="project.is_pinned ? t('Unpin') : t('Pin')"
+                        @click.stop="handlePinProject(project)">
+                        <Pin :size="14" />
                       </button>
                     </div>
                   </div>
@@ -309,7 +188,6 @@
                       @renamed="handleSessionRenamed"
                       @shared="handleSessionShared"
                       @favorited="handleSessionFavorited"
-                      @pinned="handleSessionPinned"
                       @moved="handleSessionMoved" />
                     <div
                       v-if="sessionsForProject(project.project_id).length === 0"
@@ -371,7 +249,6 @@
                   @renamed="handleSessionRenamed"
                   @shared="handleSessionShared"
                   @favorited="handleSessionFavorited"
-                  @pinned="handleSessionPinned"
                   @moved="handleSessionMoved" />
               </div>
               <div v-else class="flex flex-col items-center justify-center gap-4 py-8">
@@ -436,7 +313,7 @@
 <script setup lang="ts">
 import {
   Bot, PanelLeft, SquarePen, MessageSquareDashed, ChevronUp, ChevronRight, Search, LibraryBig,
-  Plus, FolderPlus, Check, Pin, PinOff, Folder, ListFilter, Ellipsis, Eye, Trash, Pencil,
+  Plus, FolderPlus, Check, Pin, Folder, ListFilter,
 } from 'lucide-vue-next';
 import SessionItem from './SessionItem.vue';
 import UserMenu from './UserMenu.vue';
@@ -445,12 +322,10 @@ import ManusLogoTextIcon from './icons/ManusLogoTextIcon.vue';
 import { useSessionSidebar } from '../composables/useSessionSidebar';
 import { useAuth } from '../composables/useAuth';
 import { useDialog } from '../composables/useDialog';
-import { useContextMenu, createMenuItem, createDangerMenuItem } from '../composables/useContextMenu';
 import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getSessions, connectSessionsListWS } from '../api/agent';
-import { getProjects, createProject, pinProject, updateProject, deleteProject } from '../api/project';
-import { getCachedClientConfig } from '../api/config';
+import { getSessionsSSE, getSessions } from '../api/agent';
+import { getProjects, createProject, pinProject } from '../api/project';
 import { ListSessionItem, ProjectItem } from '../types/response';
 import { useI18n } from 'vue-i18n';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
@@ -460,57 +335,14 @@ type TaskFilter = 'all' | 'favorites' | 'shared' | 'noProject'
 
 const { t } = useI18n()
 const { isSessionSidebarShow, toggleSessionSidebar } = useSessionSidebar()
-const { showInputDialog, showConfirmDialog } = useDialog()
-const { showContextMenu } = useContextMenu()
+const { showInputDialog } = useDialog()
 const route = useRoute()
 const router = useRouter()
 
 const sessions = ref<ListSessionItem[]>([])
 const projects = ref<ProjectItem[]>([])
-const cancelSessionsListWS = ref<(() => void) | null>(null)
-
-const upsertSessionItem = (item: ListSessionItem) => {
-  const rest = sessions.value.filter(s => s.session_id !== item.session_id)
-  const next = [...rest, item]
-  next.sort((a, b) => (b.latest_message_at ?? 0) - (a.latest_message_at ?? 0))
-  sessions.value = next
-}
-
-const updateSessions = async () => {
-  try {
-    const response = await getSessions()
-    sessions.value = response.sessions
-  } catch (error) {
-    console.error('Failed to fetch sessions:', error)
-  }
-}
-
-const fetchSessions = async () => {
-  try {
-    if (cancelSessionsListWS.value) {
-      cancelSessionsListWS.value()
-      cancelSessionsListWS.value = null
-    }
-    cancelSessionsListWS.value = connectSessionsListWS({
-      onMessage: (msg) => {
-        if (msg.op === 'snapshot') {
-          sessions.value = msg.sessions
-        } else if (msg.op === 'upsert') {
-          upsertSessionItem(msg.session)
-        } else if (msg.op === 'remove') {
-          sessions.value = sessions.value.filter(s => s.session_id !== msg.session_id)
-        }
-      },
-      onError: () => {
-        console.error('Sessions list WS error')
-      },
-    })
-  } catch (error) {
-    console.error('Failed to connect sessions list WS:', error)
-  }
-}
+const cancelGetSessionsSSE = ref<(() => void) | null>(null)
 const isListScrolled = ref(false)
-const clawEnabled = ref(false)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const filterMenuRef = ref<HTMLElement | null>(null)
 
@@ -518,7 +350,6 @@ const showSearch = ref(false)
 const taskFilter = ref<TaskFilter>('all')
 const showFilterMenu = ref(false)
 const expandedProjectIds = ref<Set<string>>(new Set())
-const pinnedCollapsed = ref(false)
 const projectsCollapsed = ref(false)
 const tasksCollapsed = ref(false)
 
@@ -555,8 +386,7 @@ const filteredSessions = computed(() => {
     list = list.filter(s => !s.project_id)
   }
 
-  // Pinned tasks float to the top within the current filter
-  return [...list].sort((a, b) => Number(!!b.is_pinned) - Number(!!a.is_pinned))
+  return list
 })
 
 const emptyListText = computed(() => {
@@ -573,14 +403,8 @@ const emptyListText = computed(() => {
 })
 
 const sessionsForProject = (projectId: string) => {
-  return sessions.value
-    .filter(s => s.project_id === projectId)
-    .sort((a, b) => Number(!!b.is_pinned) - Number(!!a.is_pinned))
+  return sessions.value.filter(s => s.project_id === projectId)
 }
-
-/** Official selectRenderPinnedItems / unpinnedProjects */
-const pinnedProjects = computed(() => projects.value.filter(p => p.is_pinned))
-const unpinnedProjects = computed(() => projects.value.filter(p => !p.is_pinned))
 
 const handleClickOutside = (event: MouseEvent) => {
   if (showUserMenu.value && profileRef.value && !profileRef.value.contains(event.target as Node)) {
@@ -594,6 +418,34 @@ const handleClickOutside = (event: MouseEvent) => {
 const handleListScroll = () => {
   if (scrollContainerRef.value) {
     isListScrolled.value = scrollContainerRef.value.scrollTop > 0
+  }
+}
+
+const updateSessions = async () => {
+  try {
+    const response = await getSessions()
+    sessions.value = response.sessions
+  } catch (error) {
+    console.error('Failed to fetch sessions:', error)
+  }
+}
+
+const fetchSessions = async () => {
+  try {
+    if (cancelGetSessionsSSE.value) {
+      cancelGetSessionsSSE.value()
+      cancelGetSessionsSSE.value = null
+    }
+    cancelGetSessionsSSE.value = await getSessionsSSE({
+      onMessage: (event) => {
+        sessions.value = event.data.sessions
+      },
+      onError: (error) => {
+        console.error('Failed to fetch sessions:', error)
+      }
+    })
+  } catch (error) {
+    console.error('Failed to fetch sessions:', error)
   }
 }
 
@@ -652,88 +504,13 @@ const toggleProjectExpand = (projectId: string) => {
 const handlePinProject = async (project: ProjectItem) => {
   try {
     const updated = await pinProject(project.project_id, !project.is_pinned)
-    projects.value = projects.value.map(p =>
-      p.project_id === updated.project_id ? updated : p,
-    )
-    if (updated.is_pinned) {
-      pinnedCollapsed.value = false
-    }
-    showSuccessToast(updated.is_pinned ? t('Project pinned') : t('Project unpinned'))
+    projects.value = projects.value
+      .map(p => p.project_id === updated.project_id ? updated : p)
+      .sort((a, b) => Number(b.is_pinned) - Number(a.is_pinned))
+    showSuccessToast(updated.is_pinned ? t('Pinned') : t('Unpinned'))
   } catch {
     showErrorToast(t('Failed to update project'))
   }
-}
-
-const handleEditProject = (project: ProjectItem) => {
-  showInputDialog({
-    title: t('Edit project'),
-    initialValue: project.name,
-    placeholder: t('Enter project name'),
-    confirmText: t('Save'),
-    onConfirm: async (value: string) => {
-      if (!value) return
-      try {
-        const updated = await updateProject(project.project_id, { name: value })
-        projects.value = projects.value.map(p =>
-          p.project_id === updated.project_id ? updated : p,
-        )
-        eventBus.emit('projects:changed')
-        showSuccessToast(t('Project updated successfully'))
-      } catch {
-        showErrorToast(t('Failed to update project'))
-      }
-    },
-  })
-}
-
-const handleDeleteProject = (project: ProjectItem) => {
-  showConfirmDialog({
-    title: t('Delete project?'),
-    content: t('Tasks in this project will not be deleted, but they will be removed from the project.'),
-    confirmText: t('Delete'),
-    confirmType: 'danger',
-    onConfirm: async () => {
-      try {
-        await deleteProject(project.project_id)
-        projects.value = projects.value.filter(p => p.project_id !== project.project_id)
-        sessions.value = sessions.value.map(s =>
-          s.project_id === project.project_id ? { ...s, project_id: null } : s,
-        )
-        eventBus.emit('projects:changed')
-        eventBus.emit('sessions:changed')
-        showSuccessToast(t('Project deleted'))
-        if (route.path === `/project/${project.project_id}`) {
-          await router.push('/')
-        }
-      } catch {
-        showErrorToast(t('Failed to update project'))
-      }
-    },
-  })
-}
-
-/** Official project row … menu: Unpin|Pin / Edit / View project / Delete */
-const handleProjectMenuClick = (event: MouseEvent, project: ProjectItem) => {
-  event.stopPropagation()
-  const target = event.currentTarget as HTMLElement
-  const pinnedNow = !!project.is_pinned
-  const items = [
-    createMenuItem('pin', pinnedNow ? t('Unpin') : t('Pin'), { icon: pinnedNow ? PinOff : Pin }),
-    createMenuItem('edit', t('Edit'), { icon: Pencil }),
-    createMenuItem('view', t('View project'), { icon: Eye }),
-    createDangerMenuItem('delete', t('Delete'), { icon: Trash }),
-  ]
-  showContextMenu(project.project_id, target, items, async (key: string) => {
-    if (key === 'pin') {
-      await handlePinProject(project)
-    } else if (key === 'edit') {
-      handleEditProject(project)
-    } else if (key === 'view') {
-      openProject(project.project_id)
-    } else if (key === 'delete') {
-      handleDeleteProject(project)
-    }
-  })
 }
 
 const loadProjects = async () => {
@@ -743,10 +520,6 @@ const loadProjects = async () => {
   } catch (e) {
     console.error('Failed to load projects', e)
   }
-}
-
-const handleClawClick = () => {
-  router.push('/chat/claw')
 }
 
 const toggleFilterMenu = () => {
@@ -780,12 +553,6 @@ const handleSessionFavorited = (sessionId: string, isFavorite: boolean) => {
   )
 }
 
-const handleSessionPinned = (sessionId: string, isPinned: boolean) => {
-  sessions.value = sessions.value.map(session =>
-    session.session_id === sessionId ? { ...session, is_pinned: isPinned } : session
-  )
-}
-
 const handleSessionMoved = (sessionId: string, projectId: string | null) => {
   sessions.value = sessions.value.map(session =>
     session.session_id === sessionId ? { ...session, project_id: projectId } : session
@@ -803,10 +570,6 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 onMounted(async () => {
-  getCachedClientConfig().then(cfg => {
-    clawEnabled.value = cfg?.claw_enabled ?? false
-  })
-
   fetchSessions()
   loadProjects()
   eventBus.on('projects:changed', loadProjects)
@@ -817,9 +580,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (cancelSessionsListWS.value) {
-    cancelSessionsListWS.value()
-    cancelSessionsListWS.value = null
+  if (cancelGetSessionsSSE.value) {
+    cancelGetSessionsSSE.value()
+    cancelGetSessionsSSE.value = null
   }
 
   eventBus.off('projects:changed', loadProjects)

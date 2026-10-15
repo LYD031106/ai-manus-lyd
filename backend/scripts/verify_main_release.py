@@ -1,23 +1,21 @@
-"""Check a running main release through its public HTTP/WebSocket APIs.
+"""Verify the lightweight release through its JWT-authenticated HTTP/SSE APIs.
 
-Uses the configured local administrator without logging credentials. A unique
-test session and upload are removed in finally. --run-task explicitly permits
-the small live model/sandbox task; normal invocation checks login/history only.
+Use the configured local administrator without printing credentials. --run-task
+allows one small model/sandbox task; all fixture HTTP resources are cleaned up.
+Run in the backend environment and keep --log-file on persistent storage.
 """
 import argparse
 import asyncio
 from collections import Counter
+import hashlib
 import json
 import logging
 import os
 from pathlib import Path
 import sys
-import time
-from urllib.parse import urlsplit, urlunsplit
 import uuid
 
 import httpx
-import websockets
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.config import get_settings
@@ -32,14 +30,41 @@ def require(condition, code):
         raise CheckFailed(code)
 
 
+async def sse_events(response):
+    """Parse comments and multiline data without buffering the whole response."""
+    require(response.status_code == 200, "sse_http_" + str(response.status_code))
+    require("text/event-stream" in response.headers.get("content-type", ""), "sse_content_type")
+    kind, data = "message", []
+    async for line in response.aiter_lines():
+        if not line:
+            if data:
+                yield kind, json.loads("\n".join(data))
+            kind, data = "message", []
+        elif not line.startswith(":"):
+            field, _, value = line.partition(":")
+            if value.startswith(" "):
+                value = value[1:]
+            if field == "event":
+                kind = value
+            elif field == "data":
+                data.append(value)
+    if data:
+        yield kind, json.loads("\n".join(data))
+
+
+def history_digest(history):
+    return hashlib.sha256(json.dumps(history["events"], sort_keys=True).encode()).hexdigest()
+
+
 async def verify(args, emit):
     settings = get_settings()
     require(settings.auth_provider == "local", "local_auth_required")
+    require(settings.browser_enabled is False, "lightweight_browser_setting")
     marker = "MANUS_RELEASE_" + uuid.uuid4().hex[:12]
     fixture_name = "release-fixture-" + uuid.uuid4().hex[:12] + ".txt"
     session_id = file_id = token = None
-    cleanup_errors = []
     primary_error = None
+    cleanup_errors = []
     async with httpx.AsyncClient(base_url=args.base_url.rstrip("/") + "/api/v1/", timeout=45) as client:
         async def api(method, path, **kwargs):
             response = await client.request(method, path, **kwargs)
@@ -50,165 +75,136 @@ async def verify(args, emit):
 
         try:
             config = await api("GET", "config/frontend")
-            require(config["browser_enabled"] is False, "lightweight_browser_setting")
+            require(config["auth_provider"] == "local", "frontend_auth_setting")
             login = await api("POST", "auth/login", json={
                 "email": settings.local_auth_email,
                 "password": settings.local_auth_password,
-                "client": "web",
             })
             token = login["access_token"]
             client.headers["Authorization"] = "Bearer " + token
-            client.headers["X-Requested-With"] = "XMLHttpRequest"
             me = await api("GET", "auth/me")
             require(me["id"] == login["user"]["id"], "login_identity")
-            refresh = await api("POST", "auth/refresh", json={"refresh_token": token, "rotate": False})
+            refresh = await api("POST", "auth/refresh", json={"refresh_token": login["refresh_token"]})
             token = refresh["access_token"]
             client.headers["Authorization"] = "Bearer " + token
-            # Exercise the browser path independently of Bearer credentials.
-            del client.headers["Authorization"]
-            try:
-                cookie_me = await api("GET", "auth/me")
-                require(cookie_me["id"] == login["user"]["id"], "cookie_login_identity")
-                cookie_header = client.build_request("GET", "auth/me").headers.get("cookie")
-                require(bool(cookie_header), "browser_session_cookie_missing")
-            finally:
-                client.headers["Authorization"] = "Bearer " + token
-            emit("cookie_http_identity", success=True)
+            require((await api("GET", "auth/me"))["id"] == me["id"], "refresh_identity")
             listing = await api("GET", "sessions")
-            # Exercise the actual history endpoint under authenticated ownership.
-            own_histories = []
+            history_counts = []
             for row in listing["sessions"][:3]:
                 history = await api("GET", "sessions/" + row["session_id"])
-                own_histories.append(len(history["events"]))
-            emit("login_refresh_owned_histories", sessions=len(listing["sessions"]), history_counts=own_histories)
+                history_counts.append(len(history["events"]))
+            emit("jwt_login_refresh_owned_histories", sessions=len(listing["sessions"]), history_counts=history_counts)
             if not args.run_task:
                 return
 
+            # Only reading the attachment reveals the expected stdout marker.
             source = (
-                "This is a deployment verification fixture. Execute exactly one small Python command "
-                "in the sandbox that prints " + marker + ". Then reply with that marker. "
+                "Deployment verification fixture. Read this file, execute one small Python command "
+                "in the sandbox that prints " + marker + ", then reply with that marker. "
                 "Do not search the web or inspect unrelated files. No other deliverables are needed.\n"
             )
-            # The expected marker must only be available inside the attachment,
-            # not in its filename or path, otherwise reading it is untested.
             uploaded = await api("POST", "files", files={"file": (fixture_name, source.encode(), "text/plain")})
             file_id = uploaded["file_id"]
-            emit("upload", success=True)
-            parsed = urlsplit(args.base_url)
-            ws_base = urlunsplit(("wss" if parsed.scheme == "https" else "ws", parsed.netloc, parsed.path.rstrip("/"), "", ""))
-            headers = {"Authorization": "Bearer " + token}
-            cookie_headers = {
-                "Cookie": cookie_header,
-                "Origin": urlunsplit((parsed.scheme, parsed.netloc, "", "", "")),
-            }
-            async with websockets.connect(ws_base + "/api/v1/ws/sessions", additional_headers=cookie_headers, open_timeout=20) as list_ws:
-                snapshot = json.loads(await asyncio.wait_for(list_ws.recv(), 20))
-                require(snapshot.get("op") == "snapshot", "session_list_snapshot")
-                created = await api("PUT", "sessions")
-                session_id = created["session_id"]
-                async with asyncio.timeout(20):
-                    while True:
-                        frame = json.loads(await list_ws.recv())
-                        if frame.get("op") == "upsert" and frame.get("session", {}).get("session_id") == session_id:
+            session_id = (await api("PUT", "sessions"))["session_id"]
+            async with asyncio.timeout(20):
+                async with client.stream("POST", "sessions") as response:
+                    async for kind, data in sse_events(response):
+                        if kind == "sessions":
+                            require(any(row["session_id"] == session_id for row in data["sessions"]), "list_sse_session_missing")
                             break
-                emit("session_list_websocket", snapshot=True, create_notification=True, auth="cookie")
+                    else:
+                        raise CheckFailed("list_sse_snapshot_missing")
+            emit("session_list_sse", success=True)
 
             counts = Counter()
-            phases = []
-            async with websockets.connect(ws_base + "/api/v1/ws/chat", additional_headers=headers, open_timeout=20, max_size=8 * 1024 * 1024) as chat:
-                def envelope(kind, **extra):
-                    return {"id": uuid.uuid4().hex, "version": 2, "timestamp": int(time.time()), "type": kind, "session_id": session_id, **extra}
-
-                def validate_frame(frame):
-                    require(isinstance(frame, dict), "chat_frame_invalid")
-                    require(frame.get("type") != "error", "chat_transport_error")
-                    if frame.get("type") != "ping":
-                        require(frame.get("session_id") == session_id, "chat_frame_session_mismatch")
-
-                join_request = envelope("join_session")
-                await chat.send(json.dumps(join_request))
-                async with asyncio.timeout(20):
-                    while True:
-                        frame = json.loads(await chat.recv())
-                        validate_frame(frame)
-                        if frame.get("type") == "joined":
-                            require(frame.get("request_id") == join_request["id"], "chat_join_request_mismatch")
+            terminal_event_id = None
+            stream_timeout = httpx.Timeout(connect=20, read=None, write=45, pool=20)
+            async with asyncio.timeout(args.task_timeout):
+                async with client.stream("POST", "sessions/" + session_id + "/chat", timeout=stream_timeout, json={
+                    "message": "",
+                    "attachments": [{"file_id": file_id, "filename": fixture_name}],
+                }) as response:
+                    async for kind, data in sse_events(response):
+                        counts[kind] += 1
+                        require(kind not in ("error", "wait"), "task_" + kind)
+                        if kind == "done":
+                            terminal_event_id = data.get("event_id")
                             break
-                chat_request = envelope("chat", message="", attachments=[{"file_id": file_id, "filename": fixture_name}])
-                await chat.send(json.dumps(chat_request))
-                acknowledged = False
-                emit("attachment_only_task_submitted", session_id=session_id)
-                async with asyncio.timeout(args.task_timeout):
-                    while True:
-                        frame = json.loads(await chat.recv())
-                        validate_frame(frame)
-                        if frame.get("type") == "ack":
-                            require(frame.get("request_id") == chat_request["id"], "chat_ack_request_mismatch")
-                            require(frame.get("op") == "chat" and frame.get("ok") is True, "chat_ack_rejected")
-                            acknowledged = True
-                            emit("attachment_only_task_acknowledged", success=True)
-                        if frame.get("type") == "event":
-                            event_type = frame.get("event", "unknown")
-                            counts[event_type] += 1
-                            if event_type == "status_update":
-                                phases.append((frame.get("data") or {}).get("agent_status"))
-                            require(event_type not in ("error", "wait"), "task_" + event_type)
-                        if frame.get("type") == "stream_end":
-                            require(acknowledged, "chat_ack_missing")
-                            break
-
+            require(counts["done"] == 1, "task_done_missing")
+            require(bool(terminal_event_id), "task_done_identity_missing")
             history = await api("GET", "sessions/" + session_id)
             require(history["status"] == "completed", "task_not_completed")
-            console_outputs = []
-            assistant_messages = []
+            # The terminal event receives its durable Redis ID during publication.
+            # Wait for that event's subsequent Mongo write before comparing history.
+            async with asyncio.timeout(5):
+                while not any(event["event"] == "done" and (event.get("data") or {}).get("event_id") == terminal_event_id
+                              for event in history["events"]):
+                    await asyncio.sleep(0.1)
+                    history = await api("GET", "sessions/" + session_id)
+            console_outputs, assistant_messages = [], []
+            marker_shell_id = None
             attached_input_found = False
+            input_event_id = None
             for event in history["events"]:
                 data = event.get("data") or {}
-                if event["event"] == "message" and data.get("role") == "user":
-                    attached_input_found |= any(
-                        item.get("file_id") == file_id
-                        for item in (data.get("attachments") or [])
-                        if isinstance(item, dict)
-                    )
+                if event["event"] == "message":
+                    if data.get("role") == "user":
+                        attached_input_found |= any(
+                            item.get("file_id") == file_id
+                            for item in (data.get("attachments") or []) if isinstance(item, dict)
+                        )
+                        input_event_id = input_event_id or data.get("event_id")
+                    elif data.get("role") == "assistant":
+                        assistant_messages.append(data.get("content", ""))
                 if event["event"] == "tool" and data.get("name") == "shell":
                     content = data.get("content") or {}
                     console = content.get("console") if isinstance(content, dict) else None
                     if isinstance(console, list):
-                        console_outputs.extend(
-                            record["output"] for record in console
-                            if isinstance(record, dict) and isinstance(record.get("output"), str)
-                        )
-                if event["event"] == "message" and data.get("role") == "assistant":
-                    assistant_messages.append(data.get("content", ""))
-            # A marker in tool arguments or an echoed command is insufficient.
+                        console_outputs.extend(record["output"] for record in console
+                                               if isinstance(record, dict) and isinstance(record.get("output"), str))
+                    shell_id = (data.get("args") or {}).get("id")
+                    if shell_id and data.get("status") == "called" and isinstance(console, list):
+                        if any(isinstance(record, dict) and marker in str(record.get("output", "")).splitlines()
+                               for record in console):
+                            marker_shell_id = shell_id
             require(attached_input_found, "history_user_attachment_missing")
-            require(any(marker in text.splitlines() for text in console_outputs), "shell_stdout_marker_missing")
-            require(any(marker in text for text in assistant_messages), "assistant_marker_missing")
-            require(counts["terminal_update"] > 0, "live_terminal_update_missing")
-            require(counts["status_update"] > 0, "live_status_missing")
-            require(phases[-1] == "completed", "live_final_status_not_completed")
-            emit("live_attachment_model_sandbox_websocket_history", success=True, event_counts=dict(counts), history_events=len(history["events"]), shell_stdout_verified=True, final_status=phases[-1])
+            require(any(marker in output.splitlines() for output in console_outputs), "shell_stdout_marker_missing")
+            require(any(marker in message for message in assistant_messages), "assistant_marker_missing")
+            require(bool(marker_shell_id), "marker_shell_session_id_missing")
+            shell = await api("POST", "sessions/" + session_id + "/shell", json={"session_id": marker_shell_id})
+            require(any(marker in record.get("output", "").splitlines() for record in shell.get("console", [])), "shell_rest_stdout_missing")
+            emit("attachment_model_sandbox_sse_history", success=True, event_counts=dict(counts), history_events=len(history["events"]))
+
+            require(bool(input_event_id), "input_history_anchor_missing")
+            before_resume = history_digest(history)
+            async with asyncio.timeout(20):
+                async with client.stream("POST", "sessions/" + session_id + "/chat", json={"event_id": input_event_id}) as response:
+                    async for kind, data in sse_events(response):
+                        require(kind != "error", "history_resume_error")
+                        if kind in ("done", "wait"):
+                            break
+            require(history_digest(await api("GET", "sessions/" + session_id)) == before_resume, "resume_changed_history")
+            # Completed tasks may already have left the task registry; an empty
+            # stream is valid here. Active UUID cursor translation is covered by
+            # test_history_stream_resume, not proven by this completed-task check.
+            emit("completed_history_resume_noop", success=True, active_cursor_verified=False)
         except BaseException as exc:
             primary_error = exc
             raise
         finally:
             cleanup_file_ids = {file_id} if file_id else set()
             if session_id:
-                try:
-                    await api("POST", "sessions/" + session_id + "/stop")
-                except Exception as exc:
-                    cleanup_errors.append({"step": "stop_session", "error_type": type(exc).__name__})
-                try:
-                    # Reading the fixture can create another stored file version.
-                    # Limit cleanup to files linked to this unique test session.
-                    session_files = await api("GET", "sessions/" + session_id + "/files")
-                    cleanup_file_ids.update(item["file_id"] for item in session_files if item.get("file_id"))
-                except Exception as exc:
-                    cleanup_errors.append({"step": "list_session_files", "error_type": type(exc).__name__})
-                try:
-                    await api("DELETE", "sessions/" + session_id)
-                except Exception as exc:
-                    cleanup_errors.append({"step": "delete_session", "error_type": type(exc).__name__})
+                for step, method, path in [
+                    ("stop_session", "POST", "sessions/" + session_id + "/stop"),
+                    ("list_session_files", "GET", "sessions/" + session_id + "/files"),
+                    ("delete_session", "DELETE", "sessions/" + session_id),
+                ]:
+                    try:
+                        result = await api(method, path)
+                        if step == "list_session_files":
+                            cleanup_file_ids.update(item["file_id"] for item in result if item.get("file_id"))
+                    except Exception as exc:
+                        cleanup_errors.append({"step": step, "error_type": type(exc).__name__})
             for cleanup_file_id in cleanup_file_ids:
                 try:
                     await api("DELETE", "files/" + cleanup_file_id)
@@ -219,7 +215,7 @@ async def verify(args, emit):
                     await api("POST", "auth/logout")
                 except Exception as exc:
                     cleanup_errors.append({"step": "logout", "error_type": type(exc).__name__})
-            emit("cleanup", success=not cleanup_errors, errors=cleanup_errors)
+            emit("http_fixture_cleanup", success=not cleanup_errors, errors=cleanup_errors)
             if primary_error is None:
                 require(not cleanup_errors, "cleanup_failed")
 

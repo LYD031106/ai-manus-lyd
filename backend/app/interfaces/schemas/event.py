@@ -12,7 +12,6 @@ from app.domain.models.event import (
     TitleEvent,
     ToolEvent,
     StepEvent,
-    FileUpdateEvent,
 )
 
 class BaseEventData(BaseModel):
@@ -45,7 +44,7 @@ class CommonEventData(BaseEventData):
         }
         extra = "allow"
 
-class BaseStreamEvent(BaseModel):
+class BaseSSEEvent(BaseModel):
     event: str
     data: BaseEventData
 
@@ -62,7 +61,7 @@ class MessageEventData(BaseEventData):
     content: str
     attachments: Optional[List[FileInfoResponse]] = None
 
-class MessageStreamEvent(BaseStreamEvent):
+class MessageSSEEvent(BaseSSEEvent):
     event: Literal["message"] = "message"
     data: MessageEventData
 
@@ -95,7 +94,7 @@ class ToolEventData(BaseEventData):
     args: Dict[str, Any]
     content: Optional[ToolContent] = None
 
-class ToolStreamEvent(BaseStreamEvent):
+class ToolSSEEvent(BaseSSEEvent):
     event: Literal["tool"] = "tool"
     data: ToolEventData
 
@@ -117,55 +116,16 @@ class ToolStreamEvent(BaseStreamEvent):
             )
         )
 
-class DoneStreamEvent(BaseStreamEvent):
+class DoneSSEEvent(BaseSSEEvent):
     event: Literal["done"] = "done"
 
-class WaitStreamEvent(BaseStreamEvent):
+class WaitSSEEvent(BaseSSEEvent):
     event: Literal["wait"] = "wait"
-
-
-class TerminalUpdateEventData(BaseEventData):
-    shell_id: str
-    output: Any = None
-    description: Optional[str] = None
-
-
-class TerminalUpdateStreamEvent(BaseStreamEvent):
-    event: Literal["terminal_update"] = "terminal_update"
-    data: TerminalUpdateEventData
-
-
-class FileUpdateEventData(BaseEventData):
-    path: str
-    content: str = ""
-    old_content: Optional[str] = None
-    file: Optional[FileInfoResponse] = None
-
-
-class FileUpdateStreamEvent(BaseStreamEvent):
-    event: Literal["file_update"] = "file_update"
-    data: FileUpdateEventData
-
-    @classmethod
-    async def from_event_async(cls, event: FileUpdateEvent) -> Self:
-        file_resp = (
-            await FileInfoResponse.from_domain(event.file) if event.file else None
-        )
-        return cls(
-            data=FileUpdateEventData(
-                **BaseEventData.base_event_data(event),
-                path=event.path,
-                content=event.content,
-                old_content=event.old_content,
-                file=file_resp,
-            )
-        )
-
 
 class ErrorEventData(BaseEventData):
     error: str
 
-class ErrorStreamEvent(BaseStreamEvent):
+class ErrorSSEEvent(BaseSSEEvent):
     event: Literal["error"] = "error"
     data: ErrorEventData
 
@@ -174,7 +134,7 @@ class StepEventData(BaseEventData):
     id: str
     description: str
 
-class StepStreamEvent(BaseStreamEvent):
+class StepSSEEvent(BaseSSEEvent):
     event: Literal["step"] = "step"
     data: StepEventData
 
@@ -192,14 +152,14 @@ class StepStreamEvent(BaseStreamEvent):
 class TitleEventData(BaseEventData):
     title: str
 
-class TitleStreamEvent(BaseStreamEvent):
+class TitleSSEEvent(BaseSSEEvent):
     event: Literal["title"] = "title"
     data: TitleEventData
 
 class PlanEventData(BaseEventData):
     steps: List[StepEventData]
 
-class PlanStreamEvent(BaseStreamEvent):
+class PlanSSEEvent(BaseSSEEvent):
     event: Literal["plan"] = "plan"
     data: PlanEventData
 
@@ -217,64 +177,60 @@ class PlanStreamEvent(BaseStreamEvent):
             )
         )
 
-class CommonStreamEvent(BaseStreamEvent):
+class CommonSSEEvent(BaseSSEEvent):
     event: str
     data: CommonEventData
 
-AgentStreamEvent = Union[
-    PlanStreamEvent,
-    MessageStreamEvent,
-    TitleStreamEvent,
-    ToolStreamEvent,
-    StepStreamEvent,
-    DoneStreamEvent,
-    ErrorStreamEvent,
-    WaitStreamEvent,
-    TerminalUpdateStreamEvent,
-    FileUpdateStreamEvent,
-    CommonStreamEvent,
+AgentSSEEvent = Union[
+    PlanSSEEvent,
+    MessageSSEEvent,
+    TitleSSEEvent,
+    ToolSSEEvent,
+    StepSSEEvent,
+    DoneSSEEvent,
+    ErrorSSEEvent,
+    WaitSSEEvent,
+    CommonSSEEvent,
 ]
 
-# Explicit registry: domain event type -> wire stream event class.
+# Explicit registry: domain event type -> SSE event class.
 # Register new event types here when adding them to AgentEvent.
-_EVENT_TYPE_TO_STREAM_CLASS: Dict[str, Type[BaseStreamEvent]] = {
-    "plan": PlanStreamEvent,
-    "message": MessageStreamEvent,
-    "title": TitleStreamEvent,
-    "tool": ToolStreamEvent,
-    "step": StepStreamEvent,
-    "done": DoneStreamEvent,
-    "error": ErrorStreamEvent,
-    "wait": WaitStreamEvent,
-    "terminal_update": TerminalUpdateStreamEvent,
-    "file_update": FileUpdateStreamEvent,
+_EVENT_TYPE_TO_SSE_CLASS: Dict[str, Type[BaseSSEEvent]] = {
+    "plan": PlanSSEEvent,
+    "message": MessageSSEEvent,
+    "title": TitleSSEEvent,
+    "tool": ToolSSEEvent,
+    "step": StepSSEEvent,
+    "done": DoneSSEEvent,
+    "error": ErrorSSEEvent,
+    "wait": WaitSSEEvent,
 }
 
 class EventMapper:
-    """Map AgentEvent (domain) to AgentStreamEvent (WS / REST wire format)"""
+    """Map AgentEvent (domain) to SSEEvent (wire format)"""
 
     @staticmethod
-    async def event_to_stream_event(
+    async def event_to_sse_event(
         event: AgentEvent,
         include_file_urls: bool = True,
-    ) -> AgentStreamEvent:
-        stream_event_class = _EVENT_TYPE_TO_STREAM_CLASS.get(event.type, CommonStreamEvent)
+    ) -> AgentSSEEvent:
+        sse_event_class = _EVENT_TYPE_TO_SSE_CLASS.get(event.type, CommonSSEEvent)
         # Classes needing IO (e.g. signed URLs) define from_event_async
-        from_event_async = getattr(stream_event_class, "from_event_async", None)
+        from_event_async = getattr(sse_event_class, "from_event_async", None)
         if from_event_async is not None:
-            if stream_event_class is MessageStreamEvent:
+            if sse_event_class is MessageSSEEvent:
                 return await from_event_async(event, include_file_urls=include_file_urls)
             return await from_event_async(event)
-        return stream_event_class.from_event(event)
+        return sse_event_class.from_event(event)
 
     @staticmethod
-    async def events_to_stream_events(
+    async def events_to_sse_events(
         events: List[AgentEvent],
         include_file_urls: bool = True,
-    ) -> List[AgentStreamEvent]:
-        """Create wire event list from domain event list."""
+    ) -> List[AgentSSEEvent]:
+        """Create SSE event list from event list"""
         return [
-            await EventMapper.event_to_stream_event(
+            await EventMapper.event_to_sse_event(
                 event,
                 include_file_urls=include_file_urls,
             )

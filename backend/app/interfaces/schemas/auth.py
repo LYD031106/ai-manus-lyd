@@ -8,8 +8,6 @@ class LoginRequest(BaseModel):
     """Login request schema"""
     email: str
     password: str
-    # web | ios | android — selects session TTL
-    client: Optional[str] = "web"
     
     @field_validator('email')
     @classmethod
@@ -31,7 +29,6 @@ class RegisterRequest(BaseModel):
     fullname: str
     email: str
     password: str
-    client: Optional[str] = "web"
     
     @field_validator('fullname')
     @classmethod
@@ -88,15 +85,14 @@ class ChangeFullnameRequest(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    """Refresh token request — body optional when Cookie/Bearer present."""
-    refresh_token: Optional[str] = None
-    rotate: bool = False
+    """Refresh token request schema"""
+    refresh_token: str
     
     @field_validator('refresh_token')
     @classmethod
     def validate_refresh_token(cls, v):
-        if v is not None and not v:
-            raise ValueError("refresh_token must not be empty when provided")
+        if not v:
+            raise ValueError("Refresh token is required")
         return v
 
 
@@ -192,5 +188,4 @@ class AuthStatusResponse(BaseModel):
 class RefreshTokenResponse(BaseModel):
     """Refresh token response schema"""
     access_token: str
-    refresh_token: Optional[str] = None
     token_type: str = "bearer" 

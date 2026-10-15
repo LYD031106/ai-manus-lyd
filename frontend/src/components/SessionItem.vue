@@ -108,37 +108,24 @@
     <div class="flex-1 min-w-0 flex gap-[4px] items-center text-[14px] text-[var(--text-primary)]">
       <span
         class="truncate"
+        :class="hasUnread ? 'font-semibold' : 'font-normal'"
         :title="session.title || t('New Chat')">
         {{ session.title || t('New Chat') }}
       </span>
+      <Star
+        v-if="session.is_favorite"
+        :size="12"
+        class="shrink-0 text-[var(--function-warning)]"
+        fill="var(--function-warning)" />
     </div>
 
-    <!-- Official rightSlot: unread (16px) XOR favorite star, then more (32px swap on hover) -->
-    <div class="flex items-center">
+    <div class="shrink-0 flex items-center gap-1">
       <div
-        v-if="hasUnread || session.is_favorite"
-        class="size-[32px] flex items-center justify-center overflow-hidden group-hover:size-0"
-        :class="isContextMenuOpen ? '!size-0' : ''">
-        <div
-          v-if="hasUnread"
-          class="flex items-center justify-center h-[16px] min-w-[16px] px-[4px] rounded-full bg-[var(--function-error)] text-[var(--text-white)]">
-          <span class="text-[10px] font-[500] leading-normal">
-            {{ unreadBadge }}
-          </span>
-        </div>
-        <Star
-          v-else
-          :size="16"
-          class="text-[var(--function-warning)]"
-          fill="var(--function-warning)"
-        />
-      </div>
-      <div
-        class="rounded-[8px] cursor-pointer flex items-center justify-center size-0 overflow-hidden group-hover:size-[32px] hover:bg-[var(--fill-tsp-white-light)]"
-        :class="isContextMenuOpen ? '!size-[32px] bg-[var(--fill-tsp-white-light)]' : ''"
+        @click.stop="handleSessionMenuClick"
+        class="group-hover:flex hidden size-8 rounded-[8px] cursor-pointer items-center justify-center hover:bg-[var(--fill-tsp-white-light)]"
+        :class="isContextMenuOpen ? '!flex bg-[var(--fill-tsp-white-light)]' : ''"
         :title="t('More options')"
-        @pointerdown.stop
-        @click.stop="handleSessionMenuClick">
+        aria-expanded="false" aria-haspopup="dialog">
         <Ellipsis :size="18" class="text-[var(--icon-tertiary)]" />
       </div>
     </div>
@@ -146,12 +133,12 @@
 </template>
 
 <script setup lang="ts">
-import { Ellipsis, FileText, Trash, Share2, Pencil, Star, ExternalLink, FolderPlus, Folder, FolderSync, Pin } from 'lucide-vue-next';
+import { Ellipsis, FileText, Trash, Share2, Pencil, Star, ExternalLink, FolderPlus } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { ListSessionItem, SessionStatus, ProjectItem } from '../types/response';
-import { useContextMenu, createDangerMenuItem, createMenuItem, createSeparator, createSubmenuItem } from '../composables/useContextMenu';
+import { useContextMenu, createDangerMenuItem, createMenuItem } from '../composables/useContextMenu';
 import { useDialog } from '../composables/useDialog';
 import {
   deleteSession,
@@ -159,13 +146,10 @@ import {
   updateSessionTitle,
   favoriteSession,
   unfavoriteSession,
-  pinSession,
   moveSessionProject,
 } from '../api/agent';
-import { createProject } from '../api/project';
 import { showSuccessToast, showErrorToast } from '../utils/toast';
 import { formatCustomTime } from '../utils/time';
-import { eventBus } from '../utils/eventBus';
 
 interface Props {
   session: ListSessionItem;
@@ -194,22 +178,17 @@ const emit = defineEmits<{
   (e: 'renamed', sessionId: string, title: string): void
   (e: 'shared', sessionId: string): void
   (e: 'favorited', sessionId: string, isFavorite: boolean): void
-  (e: 'pinned', sessionId: string, isPinned: boolean): void
   (e: 'moved', sessionId: string, projectId: string | null): void
 }>();
 
 const currentSessionId = computed(() => route.params.sessionId as string);
 const isCurrentSession = computed(() => currentSessionId.value === props.session.session_id);
 
-// Official: !isCurrent && getUnreadBadgeCount(session) > 0
-// getUnreadBadgeCount → 0 while activity (running/waiting/in_queue/created)
 const hasUnread = computed(() => {
-  if (isCurrentSession.value) return false;
   const active = props.session.status === SessionStatus.RUNNING
     || props.session.status === SessionStatus.PENDING
     || props.session.status === SessionStatus.WAITING;
-  if (active) return false;
-  return (props.session.unread_message_count ?? 0) > 0;
+  return !active && (props.session.unread_message_count ?? 0) > 0;
 });
 
 const unreadBadge = computed(() => {
@@ -238,34 +217,25 @@ const handleSessionMenuClick = (event: MouseEvent) => {
   const target = event.currentTarget as HTMLElement;
   isContextMenuOpen.value = true;
   const favoritedNow = !!props.session.is_favorite;
-  const pinnedNow = !!props.session.is_pinned;
 
   const items = [
     createMenuItem('share', t('Share'), { icon: Share2 }),
     createMenuItem('rename', t('Rename'), { icon: Pencil }),
+    createMenuItem('favorite', favoritedNow ? t('Unfavorite') : t('Add to favorites'), { icon: Star }),
     createMenuItem('open', t('Open in new tab'), { icon: ExternalLink }),
   ];
 
-  // Official: single「移动到项目」row → submenu (新项目 / projects)
-  const moveChildren = [
-    createMenuItem('new_project', t('New project'), { icon: FolderPlus }),
-    createSeparator(),
-    ...props.projects.map((project) =>
-      createMenuItem(`move:${project.project_id}`, project.name, {
-        icon: Folder,
-        checked: project.project_id === props.session.project_id,
-      }),
-    ),
-  ];
-  if (props.session.project_id) {
-    moveChildren.push(createSeparator());
-    moveChildren.push(createMenuItem('remove_project', t('Remove from project'), { icon: Folder }));
+  if (props.projects.length > 0) {
+    for (const project of props.projects) {
+      if (project.project_id !== props.session.project_id) {
+        items.push(createMenuItem(`move:${project.project_id}`, `${t('Move to project')}: ${project.name}`, { icon: FolderPlus }));
+      }
+    }
   }
-  items.push(createSubmenuItem('move_project', t('Move to project'), moveChildren, { icon: FolderSync }));
+  if (props.session.project_id) {
+    items.push(createMenuItem('remove_project', t('Remove from project'), { icon: FolderPlus }));
+  }
 
-  items.push(createSeparator());
-  items.push(createMenuItem('pin', pinnedNow ? t('Unpin') : t('Pin'), { icon: Pin }));
-  items.push(createMenuItem('favorite', favoritedNow ? t('Unfavorite') : t('Add to favorites'), { icon: Star }));
   items.push(createDangerMenuItem('delete', t('Delete'), { icon: Trash }));
 
   showContextMenu(props.session.session_id, target, items, async (itemKey: string) => {
@@ -300,14 +270,6 @@ const handleSessionMenuClick = (event: MouseEvent) => {
           }
         }
       });
-    } else if (itemKey === 'pin') {
-      try {
-        const result = await pinSession(props.session.session_id, !pinnedNow);
-        emit('pinned', props.session.session_id, result.is_pinned);
-        showSuccessToast(result.is_pinned ? t('Task pinned') : t('Task unpinned'));
-      } catch {
-        showErrorToast(t('Failed to update pin'));
-      }
     } else if (itemKey === 'favorite') {
       try {
         const result = favoritedNow
@@ -320,27 +282,8 @@ const handleSessionMenuClick = (event: MouseEvent) => {
       }
     } else if (itemKey === 'open') {
       window.open(`/chat/${props.session.session_id}`, '_blank');
-    } else if (itemKey === 'new_project') {
-      showInputDialog({
-        title: t('New project'),
-        placeholder: t('Enter project name'),
-        confirmText: t('Create'),
-        onConfirm: async (value: string) => {
-          if (!value) return;
-          try {
-            const project = await createProject(value);
-            await moveSessionProject(props.session.session_id, project.project_id);
-            emit('moved', props.session.session_id, project.project_id);
-            eventBus.emit('projects:changed');
-            showSuccessToast(t('Moved to project'));
-          } catch {
-            showErrorToast(t('Failed to create project'));
-          }
-        },
-      });
     } else if (itemKey.startsWith('move:')) {
       const projectId = itemKey.slice(5);
-      if (projectId === props.session.project_id) return;
       try {
         await moveSessionProject(props.session.session_id, projectId);
         emit('moved', props.session.session_id, projectId);
