@@ -39,7 +39,7 @@ class BaseAgent(ABC):
     """
 
     name: str = ""
-    max_iterations: int = 100
+    max_iterations: int = 300
     max_retries: int = 3
     retry_interval: float = 1.0
     # Arbitrary shell/MCP/write operations may take effect before raising. Only
