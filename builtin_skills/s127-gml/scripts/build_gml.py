@@ -365,7 +365,8 @@ def fmt_pos(pos) -> str:
 # 主构建流程
 # ---------------------------------------------------------------------------
 
-def build(doc: dict, assoc_objects: bool = False):
+def build(doc: dict, assoc_objects: bool = False, *, draft: bool = False):
+    warnings.clear()
     ds = doc.get("dataset") or {}
     name = ds.get("name")
     if not name:
@@ -546,23 +547,24 @@ def build(doc: dict, assoc_objects: bool = False):
             member_lines += render_value(key, attrs[key], 3, ftype)
         member_lines.append(f"{IND*2}</{ftype}>")
 
-    if not pool.coords:
+    if not pool.coords and not draft:
         raise ValueError("数据集不含任何坐标，无法计算 gml:boundedBy")
-    lo_lat, lo_lon, hi_lat, hi_lon = pool.envelope()
 
     out = ['<?xml version="1.0" encoding="UTF-8"?>']
     out.append(f'<S127:Dataset {NS_ATTRS} gml:id="ds">')
-    out.append(f"{IND}<gml:boundedBy>")
-    out.append(f'{IND*2}<gml:Envelope srsName="{SRS}">')
-    out.append(f"{IND*3}<gml:lowerCorner>{fmt_num(lo_lat)} {fmt_num(lo_lon)}</gml:lowerCorner>")
-    out.append(f"{IND*3}<gml:upperCorner>{fmt_num(hi_lat)} {fmt_num(hi_lon)}</gml:upperCorner>")
-    out.append(f"{IND*2}</gml:Envelope>")
-    out.append(f"{IND}</gml:boundedBy>")
+    if pool.coords:
+        lo_lat, lo_lon, hi_lat, hi_lon = pool.envelope()
+        out.append(f"{IND}<gml:boundedBy>")
+        out.append(f'{IND*2}<gml:Envelope srsName="{SRS}">')
+        out.append(f"{IND*3}<gml:lowerCorner>{fmt_num(lo_lat)} {fmt_num(lo_lon)}</gml:lowerCorner>")
+        out.append(f"{IND*3}<gml:upperCorner>{fmt_num(hi_lat)} {fmt_num(hi_lon)}</gml:upperCorner>")
+        out.append(f"{IND*2}</gml:Envelope>")
+        out.append(f"{IND}</gml:boundedBy>")
     out.append(f"{IND}<s100:DatasetIdentificationInformation>")
     for tag, value in DATASET_IDENTIFICATION:
         out.append(f"{IND*2}<s100:{tag}>{value}</s100:{tag}>")
         if tag == "applicationProfile":
-            out.append(f"{IND*2}<s100:datasetFileIdentifier>{name}.gml</s100:datasetFileIdentifier>")
+            out.append(f"{IND*2}<s100:datasetFileIdentifier>{esc(name)}.gml</s100:datasetFileIdentifier>")
             out.append(f"{IND*2}<s100:datasetTitle>{esc(ds.get('title', name))}</s100:datasetTitle>")
             if ds.get("referenceDate"):
                 out.append(f"{IND*2}<s100:datasetReferenceDate>{ds['referenceDate']}</s100:datasetReferenceDate>")
@@ -586,6 +588,15 @@ def feature_label(feat: dict) -> str:
     return str(feat.get("ref", ""))
 
 
+def write_assoc_csv(path: Path, rows: list[dict]) -> None:
+    fields = ["源要素", "源要素类型", "关联角色", "关联类", "目标要素", "目标要素类型",
+              "关联类型", "GML 已承载", "条文出处", "备注"]
+    with path.open("w", encoding="utf-8-sig", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="要素清单 JSON → S-127 GML")
     ap.add_argument("featureset", help="要素清单 JSON 路径")
@@ -605,10 +616,7 @@ def main() -> int:
           f"{'，关联类型已写入 GML' if args.assoc_objects else ''}）")
 
     if args.assoc_csv and assoc_rows:
-        with open(args.assoc_csv, "w", encoding="utf-8-sig", newline="") as fh:
-            writer = csv.DictWriter(fh, fieldnames=list(assoc_rows[0].keys()))
-            writer.writeheader()
-            writer.writerows(assoc_rows)
+        write_assoc_csv(Path(args.assoc_csv), assoc_rows)
         print(f"[OK] 已生成关联清单 {args.assoc_csv}（{len(assoc_rows)} 条）")
 
     todo = [r for r in assoc_rows if r["GML 已承载"] == "否，需系统内补录"]

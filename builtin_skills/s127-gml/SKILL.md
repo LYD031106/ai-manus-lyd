@@ -29,11 +29,13 @@ GML 的命名空间、几何图元链、`gml:id` 串联、`boundedBy`、`xlink:a
 一处写错整份数据集就废了。**本技能的分工是：你负责判断与编码，脚本负责序列化。**
 
 ```
-多个 PDF/Word → ①解析为 MD → ②基于 MD 生成要素清单 JSON → ③校验 → ④构建 GML → ⑤记录表 → ⑥系统导入与补录
- （用户上传）  （parse_office+parse_regulation）（你的产出）      （脚本）   （脚本）    （脚本）    （人工）
+法规及附件 → 解析与编码 → 初始 GML、要素清单 JSON、几何报告
+同名准确几何 GML + 要素清单 JSON → 补录并重建完整 GML
+待审的最终 GML → 数据标准与编码检查报告
 ```
 
-绝不直接生成 `.gml` 文本。只生成 `featureset.json`，然后用脚本完成后续步骤。
+GML 一律由脚本生成。根据上传件和用户意图选择阶段，可在现有聊天中分多轮完成。
+用户上传 GML 用于补录时执行阶段二，上传 GML 要求审查时执行阶段三。多份草稿并存时先确认对应数据集。
 
 ## 要素清单先定稿（按公告逐条列举）
 
@@ -47,14 +49,16 @@ GML 的命名空间、几何图元链、`gml:id` 串联、`boundedBy`、`xlink:a
 1. **数量/类型/名称由公告和附件决定。** 公告分别命名的水域、桥梁、航段、掉头区、锚地、警戒区、报告类型，逐条建；公告明确写“整体划定/合并为一处”的才合并。不要凭经验默认增删。
 2. **不得默认新增信息要素。** Authority、Applicability、ShipReport、ContactDetails、Regulations、ServiceHours 只有公告/配方明确要求时才建；不要因为“规则上更完整”就额外增加。
 3. **不得把公告分别命名的长航段、多桥、多报告类型合并。** 公告没有说“整体一处”的，不要自行合并；公告没有区分的，也不要自行拆分。
-4. **名称用公告/附件原名。** 必须带所属海域/港口/航路段；附件原名已带区域的直接照抄，不得裁剪。
+4. **名称用公告/附件原名。** 保留原名中的海域、港口和航路段；原名没有的地名前缀不添加。
 5. **几何类型按附件。** 航路附件给了宽度就必须建 `surface`（中心线 + 宽度/2 缓冲），未给宽度才建 `curve`。
 6. **清单与公告逐条对齐。** 数量对不上时回到公告核对，不要套用固定数字；清单定稿后再写 JSON。
 
 ### 缺坐标/缺附件的处理
 
 - 公告写“详见附件”但附件未提供时：先明确缺什么，不要用 OSM、示意图或网页检索无限反推。
-- 确实没有坐标时：**建要素 + 几何留空 + 记录表写“几何待人工录入”**，先交付 `featureset.json`、记录表和说明；不要因为几何缺失中止整个任务。
+- 确实没有坐标时：建要素并保留属性及关联，几何留空。只有概位或勾绘结果时，设置 `"geometryStatus": "review"`。
+  阶段一交付初始 GML（没有任何坐标也可生成）、完整要素清单及记录表，并请用户提供同名准确几何。
+  涉及待补录 VTS 几何的 ShipReport 关联也列入报告。
 - 单步工具调用控制在 **30–50 次**；解析、OCR、坐标、构建分步落盘，迭代将尽时优先交付已完成部分，不要直接耗尽 100 次。
 
 ### ① 解析：文本走脚本，图走模型
@@ -123,17 +127,33 @@ S=/opt/skills/s127-gml/scripts
 
 # ② 你阅读 解析结果.md，生成 featureset.json
 
-# ③ 校验，改到 0 ERROR
-python3 $S/validate_featureset.py featureset.json
+# 阶段一：校验并构建 127CN00XXX001.draft.gml，列出全部要素及几何状态
+python3 $S/geometry_workflow.py draft featureset.json \
+       -o 127CN00XXX001.gml --report 几何清单.md --assoc-csv 关联补录清单.csv
 
-# ④ 构建 GML
-python3 $S/build_gml.py featureset.json \
-       -o 127CN00XXX001.gml --assoc-csv 关联补录清单.csv
+# 阶段二：按名称补录用户上传的准确几何
+python3 $S/geometry_workflow.py complete featureset.json 准确几何.gml \
+       -o 127CN00XXX001.gml --featureset-out featureset-complete.json \
+       --report 几何补录报告.md --assoc-csv 关联补录清单.csv
 
-# ⑤ 出记录表
+# 阶段三：检查用户上传的最终 GML
+python3 $S/geometry_workflow.py check 最终.gml --report 编码检查报告.md
+
+# 阶段一、二用各自对应的 featureset JSON 出记录表
 python3 $S/make_record_table.py featureset.json \
        -o S-127要素生产与检查记录表.xlsx
 ```
+
+阶段一向用户交付草稿、原始 `featureset.json`、几何清单和记录表，说明草稿供审核。
+阶段二沿用对应 JSON，从同名的 S-127 GML 补入准确几何，并保留已编码的属性和关联。
+同名多段须在清单中分配独立 ref；确认对应关系后用 `--match 草稿ref=上传GML的gml:id`，可重复传入。
+仍有缺失、歧义、待确认或几何类型不符时继续交付草稿和报告。确认过的勾绘几何可移除
+`geometryStatus` 标记。全部几何齐全且已确认时可直接运行阶段二，省略几何 GML 参数。
+跨会话补录时，请用户重新上传阶段一的 JSON。
+
+阶段三分列目录和结构问题、编码告警和人工核对项。提供完整产品 XSD 及其依赖时用
+`--xsd /path/to/S127.xsd` 校验；缺少完整 XSD 时在报告注明未执行。
+项目确认的桥区 `fishing prohibited` (3) 使用 `--bridge-profile` 运行三个阶段，报告仍列出与官方要素目录的差异。
 
 辅助脚本：
 
@@ -201,7 +221,8 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 文件头/尾一般给出全数据集共用的两组属性，放进 JSON 的 `common`：
 
 - `fixedDateRange`：生效/失效时间（"自2024年9月7日起施行，有效期五年" → `2024-09-07` / `2029-09-06`）
-- `sourceIndication`：发文机构、文号、发文日期、发文类型
+- `sourceIndication`：发文机构、文号、文件发布日期、发文类型。找不到发布日期时省略 `reportedDate`。
+  `source` 优先使用原文或已核实的文号，缺文号时用正式文件名，缺件说明写进报告。
 
 细则见 `references/01-通用编码规则.md` §2、§4。
 
@@ -225,7 +246,8 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 | 「禁止会遇」 | `WaterwayArea`（**不是**限制区） |
 | 单向/双向通航等交通管制 | `RestrictedAreaNavigational` |
 | 商渔船碰撞高风险警示区 | `ConcentrationOfShippingHazardArea` |
-| 桥区水域 + 禁锚/限速等规定 | 建 `RestrictedAreaNavigational` 并用 `restriction` 枚举；净空高 / 禁止会遇等无枚举需求才用 `WaterwayArea`（净空信息填 `textContent`） |
+| 国内海事法规划定的桥区水域 | `RestrictedAreaNavigational`，按桥区适用条文填 `restriction`；桥梁信息通告的 `information` 只留净空高，见专题配方 §7 |
+| 管理规定中的受限普通航道 | `RestrictedAreaNavigational`，按各航段实际限制编码；明确属于定线制、推荐航路、沿海公共航路或深水航路时才按对应类别建 `RouteingMeasure` |
 | 富余水深，不同条件 | 每个条件各建一个 `UCAA`，即使几何完全相同 |
 | 船舶避险推荐水域 | `PlaceOfRefuge` |
 | 弯曲航段 / 弯道 | `RestrictedAreaNavigational`，`restriction=speed restricted`，命名 `No.N Curved Fairway Section` |
@@ -293,8 +315,8 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 > （`--assoc-objects`），但生产系统没验证过 —— 想省掉补录工序请先拿小样试。
 
 ### ⑥ 生成与自检
-依次运行：`validate_featureset.py` → `build_gml.py` → `make_record_table.py`。
-`validate_featureset.py` 的 ERROR 必须清零；WARN 逐条看过再决定忽略。
+按当前阶段运行 `geometry_workflow.py`。初始编码和补录时同时运行 `make_record_table.py`。
+ERROR 必须清零，逐条核对 WARN。即使 XML 可解析，仍要单列缺几何、概位和受影响的关联。
 交付前对照 `references/07-审核检查清单.md` 走一遍。
 
 #### 高频返工问题（来自真实审核记录）
@@ -412,5 +434,5 @@ RadioCallingInPoint
 
 - **不做** ENC/S-57 海图要素本身的编辑，也不改 `.000/.h2o` 文件
 - **不做** 无线电、雷达等通信设施覆盖范围的表达（指南第 2 章明确不表达）
-- 几何范围原文没给坐标时：优先取 ENC 同名要素，其次按示意图勾绘，
-  并在记录表里写明来源依据 —— 勾绘结果必须请人复核，不要当成确定数据交付
+- 原文没给坐标时可引用已核实的 ENC 同名要素；缺少准确来源时请用户补充同名 GML。
+  依据示意图勾绘的几何须注明依据并标为待确认。

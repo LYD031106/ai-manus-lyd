@@ -26,6 +26,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -58,7 +59,6 @@ from s127_model import (  # noqa: E402
     geometry_allowed,
     geometry_kind,
     merges_bilingual,
-    permitted_labels,
     required_attributes,
     resolve_enum,
     role_targets,
@@ -177,7 +177,8 @@ def check_against_catalogue(where: str, ftype: str, present: dict) -> None:
                         f'"{name}": {{"$nil": true}}（显式空值），而不是整个省略')
 
 
-def check_enums(where: str, node, owner: str | None = None, ftype: str | None = None) -> None:
+def check_enums(where: str, node, owner: str | None = None, ftype: str | None = None,
+                *, bridge_profile: bool = False) -> None:
     """枚举取值合法性 + 该要素类允许的枚举子集（要素目录 permittedValues）。"""
     if isinstance(node, dict):
         for key, value in node.items():
@@ -186,7 +187,13 @@ def check_enums(where: str, node, owner: str | None = None, ftype: str | None = 
             if key in ENUMS and not isinstance(value, dict):
                 for item in (value if isinstance(value, list) else [value]):
                     try:
-                        resolve_enum(key, item, ftype if owner is None else None)
+                        code, _ = resolve_enum(key, item)
+                        if (bridge_profile and owner is None and ftype == "RestrictedAreaNavigational"
+                                and key == "restriction" and code == 3):
+                            warn(f"{where}/{key}", "桥区项目兼容项：fishing prohibited (3) "
+                                 "超出 S127FC 航行限制区允许的子集，需核对桥区条款和目标系统")
+                        else:
+                            resolve_enum(key, item, ftype if owner is None else None)
                     except ValueError as exc:
                         err(f"{where}/{key}", str(exc))
             elif isinstance(value, (dict, list)):
@@ -266,11 +273,17 @@ def check_source_indication(where: str, si) -> None:
         err(where, "sourceIndication 需为对象")
         return
     check_composite(f"{where}/sourceIndication", "sourceIndicationType", si)
-    for key in ("categoryOfAuthority", "countryName", "reportedDate", "source", "sourceType"):
+    for key in ("categoryOfAuthority", "countryName", "source", "sourceType"):
         if not si.get(key):
             warn(where, f"sourceIndication 缺少 {key}（XSD 可选，但指南 4.4 要求填写）")
-    if si.get("reportedDate") and not DATE.match(str(si["reportedDate"])):
-        err(where, "sourceIndication.reportedDate 需为 YYYY-MM-DD")
+    if si.get("reportedDate"):
+        try:
+            value = str(si["reportedDate"])
+            if not DATE.fullmatch(value):
+                raise ValueError(value)
+            date.fromisoformat(value)
+        except ValueError:
+            err(where, "sourceIndication.reportedDate 需为有效的 YYYY-MM-DD 文件发布日期")
     src = si.get("source")
     if isinstance(src, str) and CJK.search(src) and not re.search(r"[\r\n]", src):
         warn(where, "sourceIndication.source 似只填了中文；指南 4.4 要求中英文同时填入（先英后中）")
@@ -390,31 +403,38 @@ def check_geometry(name: str, spec: dict) -> str | None:
         rings = [spec.get("coordinates") or spec.get("exterior")]
     else:
         rings = [spec.get("exterior") or spec.get("coordinates")] + list(spec.get("interiors", []))
-    for ring in rings:
+    minimum = {"point": 1, "curve": 2, "surface": 3}[kind]
+    for index, ring in enumerate(rings, start=1):
         if not ring:
             err(where, "缺少坐标")
             continue
+        unique = set()
         for pos in ring:
             if not isinstance(pos, (list, tuple)) or len(pos) < 2:
                 err(where, f"坐标点格式应为 [lat, lon]：{pos!r}")
                 continue
-            lat, lon = float(pos[0]), float(pos[1])
+            try:
+                lat, lon = float(pos[0]), float(pos[1])
+            except (TypeError, ValueError):
+                err(where, f"坐标点须使用数字：{pos!r}")
+                continue
+            unique.add((lat, lon))
             if not -90 <= lat <= 90:
                 err(where, f"纬度越界 {lat}；坐标顺序须为 [纬度, 经度]")
             if not -180 <= lon <= 180:
                 err(where, f"经度越界 {lon}")
             if abs(lat) > 60 and abs(lon) < 60:
                 warn(where, f"[{lat}, {lon}] 疑似经纬度写反（我国沿海纬度 3~54、经度 73~136）")
-    if kind == "surface":
-        uniq = {tuple(p) for p in (rings[0] or []) if isinstance(p, (list, tuple))}
-        if len(uniq) < 3:
-            err(where, f"面要素外环至少需要 3 个不同顶点，现有 {len(uniq)}")
+        if len(unique) < minimum:
+            err(where, f"第 {index} 组坐标至少需要 {minimum} 个不同顶点，现有 {len(unique)}")
     return kind
 
 
 # ---------------------------------------------------------------------------
 
-def validate(doc: dict) -> None:
+def validate(doc: dict, *, bridge_profile: bool = False) -> None:
+    errors.clear()
+    warns.clear()
     check_dataset(doc.get("dataset") or {})
 
     common = doc.get("common") or {}
@@ -505,7 +525,7 @@ def validate(doc: dict) -> None:
             warn(where, "专属要素应有 sourceIndication（可放在 common 里共用，指南 4.3/5.1）")
 
         # ---- 属性内部结构与枚举 ----
-        check_enums(where, attrs, None, ftype)
+        check_enums(where, attrs, ftype=ftype, bridge_profile=bridge_profile)
         for key, value in attrs.items():
             if is_bilingual_shorthand(key, value):
                 continue
@@ -552,6 +572,8 @@ def validate(doc: dict) -> None:
                     err(tag, f"非法包含类型 {itype!r}；XSD 允许 {sorted(INCLUSION_TYPES)}")
 
         # ---- 几何 ----
+        if "geometryStatus" in feat and feat["geometryStatus"] != "review":
+            err(where, "geometryStatus 仅用于标记待确认几何，值应为 review")
         if ftype in GEOGRAPHIC_FEATURES:
             gname = feat.get("geometry")
             if not gname:
@@ -646,10 +668,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="S-127 要素清单校验")
     ap.add_argument("featureset")
     ap.add_argument("--strict", action="store_true", help="把 WARN 也当作失败")
+    ap.add_argument("--bridge-profile", action="store_true", help="按桥区项目反馈将 restriction=3 的目录差异列为告警")
     args = ap.parse_args()
 
     doc = json.loads(Path(args.featureset).read_text(encoding="utf-8"))
-    validate(doc)
+    validate(doc, bridge_profile=args.bridge_profile)
 
     for e in errors:
         print(f"[ERROR] {e}")
