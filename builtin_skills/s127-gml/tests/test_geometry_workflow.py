@@ -106,6 +106,26 @@ class GeometryWorkflowTest(unittest.TestCase):
                         "--report", "broken.md", "--bridge-profile", code=1)
         self.assertIn("本地引用 '#missing' 不存在", self.report("broken.md"))
         self.assertIn("code 应为 30", self.report("broken.md"))
+        self.assertIn("东海大桥桥区安全水域", self.report("broken.md"))
+
+    def test_renamed_draft_and_unlinked_vts_report_remain_visible(self):
+        vts = feature("vts", "VesselTrafficServiceArea", "洋山交管区", geometry="a",
+                      geometryStatus="review", sourceIndication={
+                          "source": ["Announcement No.16", "第16号公告"],
+                      })
+        report = feature("report", "ShipReport", "过线报告")
+        self.write_json("initial.json", [vts, report], {"a": SURFACES["a"]})
+        self.run_script("geometry_workflow.py", "draft", "initial.json",
+                        "-o", "data.gml", "--report", "draft.md")
+        (self.directory / "data.draft.gml").rename(self.directory / "renamed.gml")
+        self.run_script("geometry_workflow.py", "check", "renamed.gml",
+                        "--report", "check.md", code=1)
+        self.assertIn("标记为流程草稿", self.report("check.md"))
+        self.assertIn("该报告未与这些区域关联", self.report("check.md"))
+        self.assertIn("未提供文件发布日期", self.report("check.md"))
+        gml = self.report("renamed.gml")
+        self.assertIn("Announcement No.16", gml)
+        self.assertNotIn("<reportedDate>", gml)
 
 
 if __name__ == "__main__":

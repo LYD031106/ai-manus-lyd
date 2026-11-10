@@ -49,6 +49,7 @@ from s127_model import (  # noqa: E402
 )
 
 IND = "  "
+DRAFT_MARKER = "s127-workflow draft"
 warnings: list[str] = []
 
 
@@ -551,6 +552,8 @@ def build(doc: dict, assoc_objects: bool = False, *, draft: bool = False):
         raise ValueError("数据集不含任何坐标，无法计算 gml:boundedBy")
 
     out = ['<?xml version="1.0" encoding="UTF-8"?>']
+    if draft:
+        out.append(f"<?{DRAFT_MARKER}?>")
     out.append(f'<S127:Dataset {NS_ATTRS} gml:id="ds">')
     if pool.coords:
         lo_lat, lo_lon, hi_lat, hi_lon = pool.envelope()

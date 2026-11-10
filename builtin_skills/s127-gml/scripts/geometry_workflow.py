@@ -11,7 +11,7 @@ from collections import Counter
 from pathlib import Path
 
 import validate_featureset as checks
-from build_gml import build, feature_label, warnings as build_warnings, write_assoc_csv
+from build_gml import DRAFT_MARKER, build, feature_label, warnings as build_warnings, write_assoc_csv
 from gml_to_featureset import (
     GML, XLINK, XSI_NIL, convert, dataset_members, local, parse_geometries, reference,
 )
@@ -38,14 +38,19 @@ def name_keys(value):
 
 
 def read_dataset(path):
-    root = ET.parse(path).getroot()
+    parser = ET.iterparse(path, events=("pi",))
+    draft = False
+    for _, instruction in parser:
+        if instruction.text == DRAFT_MARKER:
+            draft = True
+    root = parser.root
     if root.tag != S127_DATASET:
         raise ValueError("文件根元素不是本项目支持的 S-127 Dataset")
     ids = Counter(elem.get(GML + "id") for elem in root.iter() if GML + "id" in elem.attrib)
     duplicates = [gid for gid, count in ids.items() if not gid or count > 1]
     if duplicates:
         raise ValueError(f"空或重复的 gml:id：{duplicates}")
-    return root, ids
+    return root, ids, draft
 
 
 def read_geometries(root):
@@ -77,7 +82,9 @@ def geometry_for(member, geometries):
 
 
 def supplement(doc, path, matches):
-    root, _ = read_dataset(path)
+    root, _, draft = read_dataset(path)
+    if draft:
+        raise ValueError("上传的是流程草稿，请提供含准确几何的 GML")
     geometries = read_geometries(root)
     donors = {}
     for member in dataset_members(root):
@@ -254,7 +261,9 @@ def audit(args):
     structure_errors, structure_warnings = [], []
     rows, blocked = [], []
     try:
-        root, ids = read_dataset(args.input)
+        root, ids, draft = read_dataset(args.input)
+        if draft:
+            structure_errors.append("该文件标记为流程草稿，须补录或确认几何并重新生成最终 GML")
         for elem in root.iter():
             tag = local(elem.tag)
             href = elem.get(XLINK + "href", "")
@@ -272,13 +281,20 @@ def audit(args):
 
         geometries = read_geometries(root)
         for member in dataset_members(root):
+            ref = member.get(GML + "id")
+            if not ref:
+                structure_errors.append(f"{local(member.tag)} 缺少 gml:id")
             if local(member.tag) in GEOGRAPHIC_FEATURES:
-                ref = member.get(GML + "id") or local(member.tag)
+                name = member.findtext("{*}featureName/{*}name")
+                label = " / ".join(item for item in (ref, name) if item) or local(member.tag)
                 try:
                     if geometry_for(member, geometries) is None:
-                        structure_errors.append(f"{ref} 缺少几何，无法作为最终成果")
+                        structure_errors.append(f"{label} 缺少几何，无法作为最终成果")
                 except ValueError as exc:
-                    structure_errors.append(f"{ref}：{exc}")
+                    structure_errors.append(f"{label}：{exc}")
+                    # 几何错误已记录。继续检查名称、属性及依赖这个要素的关联。
+                    for geometry in member.findall("{*}geometry"):
+                        member.remove(geometry)
         doc = convert(args.input, root=root, geoms_by_id=geometries)
         checks.validate(doc, bridge_profile=args.bridge_profile)
         rows, _, blocked = inventory(doc, {})

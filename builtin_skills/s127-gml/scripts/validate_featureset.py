@@ -284,6 +284,8 @@ def check_source_indication(where: str, si) -> None:
             date.fromisoformat(value)
         except ValueError:
             err(where, "sourceIndication.reportedDate 需为有效的 YYYY-MM-DD 文件发布日期")
+    else:
+        warn(where, "未提供文件发布日期；请核对发文材料，无法确认时可省略 reportedDate")
     src = si.get("source")
     if isinstance(src, str) and CJK.search(src) and not re.search(r"[\r\n]", src):
         warn(where, "sourceIndication.source 似只填了中文；指南 4.4 要求中英文同时填入（先英后中）")
@@ -465,6 +467,10 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
         refs[ref] = feat
 
     has_authority = any(f.get("type") == "Authority" for f in features)
+    report_areas = [f for f in features
+                    if f.get("type") in {"VesselTrafficServiceArea", "ShipReportingServiceArea"}]
+    area_reports = {a.get("target") for area in report_areas
+                    for a in (area.get("associations") or []) if a.get("role") == "reptForTrafficServ"}
     used_geoms: set[str] = set()
 
     for ref, feat in refs.items():
@@ -612,6 +618,9 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
                                 f"或在系统内关联；当前两条间接路径都没有")
 
         # ---- 各要素类的指南约定 ----
+        if ftype == "ShipReport" and report_areas and ref not in area_reports:
+            warn(where, "数据集有 VTS 或船舶报告服务区，但该报告未与这些区域关联；"
+                        "若条文规定在区内报告，请核对 reptForTrafficServ")
         if ftype == "Applicability":
             conds = 0
             for key in ("categoryOfVessel", "categoryOfCargo", "categoryOfVesselRegistry",
