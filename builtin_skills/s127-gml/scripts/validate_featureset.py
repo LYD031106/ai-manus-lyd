@@ -177,6 +177,19 @@ def check_against_catalogue(where: str, ftype: str, present: dict) -> None:
                         f'"{name}": {{"$nil": true}}（显式空值），而不是整个省略')
 
 
+def bridge_area(feature):
+    if feature.get("type") != "RestrictedAreaNavigational":
+        return False
+    names = feature.get("featureName") or {}
+    if isinstance(names, list):
+        names = {item.get("language"): item.get("name") for item in names}
+    return bool(
+        re.search(r"桥(?:区(?:安全)?水域|.{0,12}通航孔航道)", names.get("zho") or "")
+        or re.search(r"\bbridge\b.*(?:safety water|bridge area|navigable span|navigation opening)",
+                     names.get("eng") or "", re.IGNORECASE)
+    )
+
+
 def check_enums(where: str, node, owner: str | None = None, ftype: str | None = None,
                 *, bridge_profile: bool = False) -> None:
     """枚举取值合法性 + 该要素类允许的枚举子集（要素目录 permittedValues）。"""
@@ -531,7 +544,7 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
             warn(where, "专属要素应有 sourceIndication（可放在 common 里共用，指南 4.3/5.1）")
 
         # ---- 属性内部结构与枚举 ----
-        check_enums(where, attrs, ftype=ftype, bridge_profile=bridge_profile)
+        check_enums(where, attrs, ftype=ftype, bridge_profile=bridge_profile and bridge_area(feat))
         for key, value in attrs.items():
             if is_bilingual_shorthand(key, value):
                 continue

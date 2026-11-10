@@ -37,6 +37,13 @@ GML 的命名空间、几何图元链、`gml:id` 串联、`boundedBy`、`xlink:a
 GML 一律由脚本生成。根据上传件和用户意图选择阶段，可在现有聊天中分多轮完成。
 用户上传 GML 用于补录时执行阶段二，上传 GML 要求审查时执行阶段三。多份草稿并存时先确认对应数据集。
 
+已有结构化成果时，用户可上传文件并发送 `S-127 /draft`（一个 featureset JSON）、
+`S-127 /complete`（一个 featureset JSON 和一个准确几何 GML）或 `S-127 /check`（一个 GML）。
+这三个入口直接运行脚本并交付附件。显式同名消歧仍使用脚本的 `--match`。
+
+源文件首次编码时，优先完成可校验的 JSON、草稿 GML 和几何清单。合并读取和写入操作，
+在同一个编码步骤内完成校验和附件交付。已有草稿即先交付，记录表、长篇复核和其他附属文件随后处理。
+
 ## 要素清单先定稿（按公告逐条列举）
 
 **在写 `featureset.json` 之前，先按公告/附件逐条列出 `/home/ubuntu/要素清单.md`：**
@@ -129,7 +136,8 @@ S=/opt/skills/s127-gml/scripts
 
 # 阶段一：校验并构建 127CN00XXX001.draft.gml，列出全部要素及几何状态
 python3 $S/geometry_workflow.py draft featureset.json \
-       -o 127CN00XXX001.gml --report 几何清单.md --assoc-csv 关联补录清单.csv
+       -o 127CN00XXX001.gml --featureset-out featureset-draft.json \
+       --report 几何清单.md --assoc-csv 关联补录清单.csv
 
 # 阶段二：按名称补录用户上传的准确几何
 python3 $S/geometry_workflow.py complete featureset.json 准确几何.gml \
@@ -144,7 +152,7 @@ python3 $S/make_record_table.py featureset.json \
        -o S-127要素生产与检查记录表.xlsx
 ```
 
-阶段一向用户交付草稿、原始 `featureset.json`、几何清单和记录表，说明草稿供审核。
+阶段一先向用户交付草稿、校验后的 featureset JSON 和几何清单，说明草稿供审核。记录表随后生成。
 阶段二沿用对应 JSON，从同名的 S-127 GML 补入准确几何，并保留已编码的属性和关联。
 同名多段须在清单中分配独立 ref；确认对应关系后用 `--match 草稿ref=上传GML的gml:id`，可重复传入。
 仍有缺失、歧义、待确认或几何类型不符时继续交付草稿和报告。确认过的勾绘几何可移除

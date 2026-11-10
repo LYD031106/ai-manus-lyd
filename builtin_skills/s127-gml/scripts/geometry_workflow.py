@@ -196,10 +196,41 @@ def format_inventory(rows):
     ]
 
 
+def prepare_draft(doc, bridge_profile):
+    """Apply narrowly scoped production rules before validating an initial draft."""
+    notes = {}
+    features = doc.get("features") or []
+    for feature in features:
+        if not bridge_profile or feature.get("type") != "RestrictedAreaNavigational" or checks.bridge_area(feature):
+            continue
+        attrs = feature.get("attributes") or {}
+        value = attrs.get("restriction")
+        restrictions = value if isinstance(value, list) else [value]
+        fishing = [item for item in restrictions
+                   if str(item).strip().lower() in {"3", "fishing prohibited"}]
+        if not fishing:
+            continue
+        attrs["restriction"] = [item for item in restrictions if item not in fishing] or {"$nil": True}
+        text = feature.get("textContent") or []
+        if isinstance(text, dict):
+            text = [text]
+        if not text:
+            text.append({"categoryOfText": "abstract or summary"})
+        existing = text[0].get("information") or []
+        if isinstance(existing, dict):
+            existing = [existing]
+        existing.append({"text": {"eng": "Fishing operations are prohibited.", "zho": "禁止捕捞作业。"}})
+        text[0]["information"] = existing
+        feature["textContent"] = text
+        notes[feature_ref(feature)] = "普通航道的禁捕捞移入条文信息；桥区兼容代码 3 不适用"
+
+    return notes
+
+
 def produce(args):
     doc = json.loads(args.input.read_text(encoding="utf-8-sig"))
+    notes = prepare_draft(doc, args.bridge_profile) if args.command == "draft" else {}
     checks.validate(doc, bridge_profile=args.bridge_profile)
-    notes = {}
     if args.command == "complete" and args.geometry_gml and not checks.errors:
         matches = dict(args.match or [])
         if len(matches) != len(args.match or []):
