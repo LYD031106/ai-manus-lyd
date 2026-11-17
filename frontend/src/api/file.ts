@@ -13,6 +13,7 @@ export interface FileInfo {
   upload_date: string;
   metadata?: Record<string, any>;
   file_url?: string;
+  shared_session_id?: string;
 }
 
 
@@ -74,7 +75,7 @@ export async function deleteFile(fileId: string): Promise<boolean> {
  */
 export async function getFileInfo(fileId: string): Promise<FileInfo | null> {
   try {
-    const response = await apiClient.get<ApiResponse<FileInfo>>(`/files/${fileId}`);
+    const response = await apiClient.get<ApiResponse<FileInfo>>(`/files/${fileId}/info`);
     return response.data.data;
   } catch (error) {
     console.error('Failed to get file info:', error);
@@ -104,8 +105,24 @@ export async function getFileDownloadUrl(
   fileInfo: FileInfo,
 ): Promise<string> {
   if (fileInfo.file_url) {
-    return `${API_CONFIG.host}${fileInfo.file_url}`;
+    const url = new URL(fileInfo.file_url, API_CONFIG.host || window.location.origin);
+    const expires = Number(url.searchParams.get('expires'));
+    if (Number.isFinite(expires) && expires > Date.now() / 1000 + 60) {
+      return url.href;
+    }
   }
-  const signedUrlResponse = await createFileSignedUrl(fileInfo.file_id);
-  return `${API_CONFIG.host}${signedUrlResponse.signed_url}`;
+  if (fileInfo.shared_session_id) {
+    const response = await apiClient.get<ApiResponse<FileInfo[]>>(
+      `/sessions/${fileInfo.shared_session_id}/share/files`,
+    );
+    const refreshed = response.data.data.find(file => file.file_id === fileInfo.file_id);
+    if (!refreshed?.file_url) {
+      throw new Error('File is no longer available in this shared session');
+    }
+    fileInfo.file_url = refreshed.file_url;
+  } else {
+    const signedUrlResponse = await createFileSignedUrl(fileInfo.file_id);
+    fileInfo.file_url = signedUrlResponse.signed_url;
+  }
+  return new URL(fileInfo.file_url, API_CONFIG.host || window.location.origin).href;
 }
