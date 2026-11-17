@@ -88,7 +88,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Download, X } from 'lucide-vue-next'
 import { useFilePreviewer } from '../composables/useFilePreviewer'
-import { getFileDownloadUrl } from '../api/file'
+import { openFileDownload } from '../utils/fileDownload'
 import { getFileType } from '../utils/fileType'
 import { useResizeObserver } from '../composables/useResizeObserver'
 import { eventBus } from '../utils/eventBus'
@@ -127,10 +127,8 @@ const isImagePreview = computed(() => {
   return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tiff', 'tif', 'heic', 'heif'].includes(ext)
 })
 
-const download = async () => {
-  if (!fileInfo.value) return
-  const url = await getFileDownloadUrl(fileInfo.value)
-  window.open(url, '_blank')
+const download = () => {
+  if (fileInfo.value) return openFileDownload(fileInfo.value)
 }
 
 onMounted(() => {

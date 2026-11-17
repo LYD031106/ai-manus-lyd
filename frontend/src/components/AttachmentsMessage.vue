@@ -78,7 +78,7 @@ const props = defineProps<{
 }>();
 
 const showAllFiles = () => {
-  showSessionFileList();
+  showSessionFileList(props.content.attachments.some(file => Boolean(file.shared_session_id)));
 };
 
 </script>

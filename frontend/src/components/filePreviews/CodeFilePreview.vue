@@ -15,14 +15,20 @@ const props = defineProps<{
   file: FileInfo
 }>()
 
-watch(() => props.file, async (file) => {
+watch(() => props.file, async (file, _, onCleanup) => {
+  content.value = ''
   if (!file?.file_id) return
+  const controller = new AbortController()
+  onCleanup(() => controller.abort())
   try {
     const url = await getFileDownloadUrl(file)
-    const response = await fetch(url)
+    if (controller.signal.aborted) return
+    const response = await fetch(url, { signal: controller.signal })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    content.value = await response.text()
+    const text = await response.text()
+    if (!controller.signal.aborted) content.value = text
   } catch (error) {
+    if (controller.signal.aborted) return
     console.error('Failed to load file content:', error)
     content.value = '(Failed to load file content)'
   }

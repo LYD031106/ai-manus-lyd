@@ -37,7 +37,7 @@
 import { computed } from 'vue';
 import { Download, X } from 'lucide-vue-next';
 import type { FileInfo } from '../api/file';
-import { getFileDownloadUrl } from '../api/file';
+import { openFileDownload } from '../utils/fileDownload';
 import { getFileType } from '../utils/fileType';
 
 const props = defineProps<{
@@ -56,8 +56,5 @@ const fileType = computed(() => {
   return getFileType(props.file.filename);
 });
 
-const download = async () => {
-  const url = await getFileDownloadUrl(props.file);
-  window.open(url, '_blank');
-};
+const download = () => openFileDownload(props.file);
 </script>

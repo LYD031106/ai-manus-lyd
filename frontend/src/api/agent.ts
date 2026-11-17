@@ -1,6 +1,6 @@
 // Backend API service
 import { apiClient, API_CONFIG, ApiResponse, createSSEConnection, SSECallbacks } from './client';
-import { AgentSSEEvent, type MessageEventData } from '../types/event';
+import { AgentSSEEvent } from '../types/event';
 import { CreateSessionResponse, GetSessionResponse, ShellViewResponse, FileViewResponse, ListSessionResponse, SignedUrlResponse, ShareSessionResponse, SharedSessionResponse } from '../types/response';
 import type { FileInfo } from './file';
 
@@ -238,14 +238,19 @@ export async function unshareSession(sessionId: string): Promise<ShareSessionRes
 export async function getSharedSession(sessionId: string): Promise<SharedSessionResponse> {
   const response = await apiClient.get<ApiResponse<SharedSessionResponse>>(`/sessions/shared/${sessionId}`);
   const session = response.data.data;
-  for (const event of session.events) {
-    if (event.event === 'message') {
-      for (const file of (event.data as MessageEventData).attachments || []) {
-        file.shared_session_id = sessionId;
-      }
-    }
-  }
-  return session;
+  return {
+    ...session,
+    events: session.events.map(event => {
+      if (!('attachments' in event.data)) return event;
+      return {
+        ...event,
+        data: {
+          ...event.data,
+          attachments: event.data.attachments?.map(file => ({ ...file, shared_session_id: sessionId })),
+        },
+      };
+    }),
+  };
 }
 
 export async function getSharedSessionFiles(sessionId: string): Promise<FileInfo[]> {

@@ -29,7 +29,7 @@ import { Download } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { computed } from 'vue';
 import type { FileInfo } from '../../api/file';
-import { getFileDownloadUrl } from '../../api/file';
+import { openFileDownload } from '../../utils/fileDownload';
 import { getFileType, getFileTypeText } from '../../utils/fileType';
 
 const { t } = useI18n();
@@ -42,8 +42,5 @@ const fileType = computed(() => {
   return getFileType(props.file.filename);
 });
 
-const download = async () => {
-  const url = await getFileDownloadUrl(props.file);
-  window.open(url, '_blank');
-};
+const download = () => openFileDownload(props.file);
 </script>

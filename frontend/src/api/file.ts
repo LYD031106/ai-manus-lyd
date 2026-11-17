@@ -1,6 +1,6 @@
 // File API service
 import { apiClient, ApiResponse, API_CONFIG } from './client';
-import { SignedUrlResponse } from '../types/response';
+import type { SharedSessionResponse, SignedUrlResponse } from '../types/response';
 
 /**
  * File info type
@@ -13,6 +13,7 @@ export interface FileInfo {
   upload_date: string;
   metadata?: Record<string, any>;
   file_url?: string;
+  /** Client-side context for files opened from a public shared conversation. */
   shared_session_id?: string;
 }
 
@@ -97,32 +98,40 @@ export async function createFileSignedUrl(fileId: string, expireMinutes: number 
 }
 
 /**
- * Get file download URL
+ * Get a fresh file download URL at the time of preview/download.
+ * file_url is a temporary capability, not a permanent address. In particular,
+ * a page or attachment may outlive the signature it was originally sent with.
  * @param file File info
  * @returns Promise resolving to file download URL string
  */
 export async function getFileDownloadUrl(
   fileInfo: FileInfo,
 ): Promise<string> {
-  if (fileInfo.file_url) {
-    const url = new URL(fileInfo.file_url, API_CONFIG.host || window.location.origin);
-    const expires = Number(url.searchParams.get('expires'));
-    if (Number.isFinite(expires) && expires > Date.now() / 1000 + 60) {
-      return url.href;
-    }
-  }
+  let url: string | undefined;
   if (fileInfo.shared_session_id) {
-    const response = await apiClient.get<ApiResponse<FileInfo[]>>(
-      `/sessions/${fileInfo.shared_session_id}/share/files`,
-    );
-    const refreshed = response.data.data.find(file => file.file_id === fileInfo.file_id);
-    if (!refreshed?.file_url) {
-      throw new Error('File is no longer available in this shared session');
+    // Public viewers cannot use the owner-only signing endpoint. Recheck that
+    // the conversation is still shared, and select this exact file version.
+    const sessionId = encodeURIComponent(fileInfo.shared_session_id);
+    const response = await apiClient.get<ApiResponse<FileInfo[]>>(`/sessions/${sessionId}/share/files`);
+    url = response.data.data.find(file => file.file_id === fileInfo.file_id)?.file_url;
+    if (!url) {
+      // A newer file may have replaced the same sandbox path in session.files;
+      // the earlier attachment remains downloadable from the shared history.
+      const history = await apiClient.get<ApiResponse<SharedSessionResponse>>(`/sessions/shared/${sessionId}`);
+      for (const event of history.data.data.events) {
+        if ('attachments' in event.data) {
+          url = event.data.attachments?.find(file => file.file_id === fileInfo.file_id)?.file_url;
+          if (url) break;
+        }
+      }
     }
-    fileInfo.file_url = refreshed.file_url;
   } else {
     const signedUrlResponse = await createFileSignedUrl(fileInfo.file_id);
-    fileInfo.file_url = signedUrlResponse.signed_url;
+    url = signedUrlResponse.signed_url;
   }
-  return new URL(fileInfo.file_url, API_CONFIG.host || window.location.origin).href;
+  if (!url) throw new Error('File is no longer available');
+  // The API normally returns a relative path; do not prefix absolute URLs twice.
+  return /^https?:\/\//i.test(url)
+    ? url
+    : `${API_CONFIG.host.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
 }

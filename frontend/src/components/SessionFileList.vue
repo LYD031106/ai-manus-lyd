@@ -39,7 +39,7 @@
                                             <span class="text-xs text-[var(--text-tertiary)]">{{
                                                 formatRelativeTime(parseISODateTime(file.upload_date)) }}</span>
                                         </div>
-                                        <div @click="downloadFile(file)"
+                                        <div @click.stop="openFileDownload(file)"
                                             class="flex items-center justify-center cursor-pointer hover:bg-[var(--fill-tsp-gray-main)] rounded-md w-8 h-8 text-[var(--icon-tertiary)]"
                                             aria-expanded="false" aria-haspopup="dialog">
                                             <Download class="size-5 text-[var(--icon-tertiary)]" />
@@ -64,7 +64,7 @@ import { X, Download, File } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import type { FileInfo } from '../api/file';
-import { getFileDownloadUrl } from '../api/file';
+import { openFileDownload } from '../utils/fileDownload';
 import { getSessionFiles, getSharedSessionFiles } from '../api/agent';
 import { formatRelativeTime, parseISODateTime } from '../utils/time';
 import { getFileType } from '../utils/fileType';
@@ -85,11 +85,6 @@ const fetchFiles = async (sessionId: string) => {
     files.value = shared.value
         ? await getSharedSessionFiles(sessionId)
         : await getSessionFiles(sessionId);
-}
-
-const downloadFile = async (fileInfo: FileInfo) => {
-    const url = await getFileDownloadUrl(fileInfo);
-    window.open(url, '_blank');
 }
 
 const showFile = (file: FileInfo) => {

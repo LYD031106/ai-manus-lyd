@@ -11,7 +11,8 @@ export function useFilePreviewer() {
   const showFilePreviewer = (file: FileInfo) => {
     eventBus.emit(EVENT_SHOW_FILE_PREVIEWER)
     visible.value = true
-    fileInfo.value = file
+    // A repeated click is a new preview request, even for the same attachment.
+    fileInfo.value = { ...file }
     isShow.value = true
   }
 

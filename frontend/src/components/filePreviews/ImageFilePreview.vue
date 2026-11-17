@@ -87,6 +87,8 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Download, X, ZoomIn, ZoomOut } from 'lucide-vue-next'
 import { getFileDownloadUrl, type FileInfo } from '../../api/file'
+import { openFileDownload } from '../../utils/fileDownload'
+import { showErrorToast } from '../../utils/toast'
 
 const props = defineProps<{
   file: FileInfo
@@ -157,19 +159,24 @@ const onPointerUp = (e: PointerEvent) => {
   isDragging.value = false
 }
 
-const download = async () => {
-  const url = await getFileDownloadUrl(props.file)
-  window.open(url, '_blank')
-}
+const download = () => openFileDownload(props.file)
 
 watch(
   () => props.file,
-  async (file) => {
-    if (!file) return
+  async (file, _, onCleanup) => {
+    imageUrl.value = ''
     scale.value = 1
     translateX.value = 0
     translateY.value = 0
-    imageUrl.value = await getFileDownloadUrl(file)
+    if (!file?.file_id) return
+    let active = true
+    onCleanup(() => { active = false })
+    try {
+      const url = await getFileDownloadUrl(file)
+      if (active) imageUrl.value = url
+    } catch {
+      if (active) showErrorToast(t('Failed to load file content'))
+    }
   },
   { immediate: true },
 )
