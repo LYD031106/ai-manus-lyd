@@ -75,6 +75,15 @@ class ExecutionAgent(BaseAgent):
             attachments="\n".join(message.attachments),
             language=plan.language
         )
+        if message.s127_checkpoint_dir:
+            request += (
+                f"\nFor S-127 source encoding, save the complete featureset JSON at "
+                f"{message.s127_checkpoint_dir}/featureset-input.json as soon as it is usable. "
+                "Create that directory in the sandbox. Call the built-in geometry_workflow.py draft "
+                "immediately after writing it and attach the GML, normalized JSON and report in "
+                "complete_step. Read the applicable recipe once, batch file reads, and deliver "
+                "the draft before optional outputs or further source investigation."
+            )
         step.status = ExecutionStatus.RUNNING
         yield StepEvent(status=StepStatus.STARTED, step=step)
         try:
@@ -94,8 +103,12 @@ class ExecutionAgent(BaseAgent):
                         step.result = report.result
                         step.attachments = report.attachments
                         yield StepEvent(status=StepStatus.COMPLETED, step=step)
-                        if step.result:
-                            yield MessageEvent(message=step.result)
+                        paths = report.attachments if message.s127_checkpoint_dir else []
+                        if step.result or paths:
+                            yield MessageEvent(
+                                message=step.result,
+                                attachments=[FileInfo(file_path=path) for path in paths] or None,
+                            )
                         continue
                     elif isinstance(event, MessageEvent):
                         continue

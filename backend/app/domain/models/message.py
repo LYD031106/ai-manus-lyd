@@ -7,6 +7,7 @@ class Message(BaseModel):
     """User-facing input message (a chat turn from the user)."""
     message: str = ""
     attachments: List[str] = []
+    s127_checkpoint_dir: Optional[str] = None
 
 
 class Role(str, Enum):

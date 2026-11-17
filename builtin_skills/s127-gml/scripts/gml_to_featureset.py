@@ -48,67 +48,98 @@ def qname(elem) -> str:
     return local(elem.tag)
 
 
+def reference(elem):
+    href = elem.get(XLINK + "href", "") if elem is not None else ""
+    if not href.startswith("#") or len(href) < 2:
+        raise ValueError(f"缺少有效的本地几何引用：{href!r}")
+    return href[1:]
+
+
 def parse_geometries(root):
-    """还原几何图元链 → {gml:id: 坐标}，以及 property 引用 → 几何定义。"""
+    """还原 S-100 的二维点、直线分段和单面拓扑几何。"""
     curves, orient, comp, surf, points = {}, {}, {}, {}, {}
+
+    def positions(elem, gid):
+        values = [float(value) for value in (elem.text or "").split()]
+        if len(values) < 2 or len(values) % 2 or elem.get("srsDimension", "2") != "2":
+            raise ValueError(f"{gid}: 坐标必须是二维经纬度对")
+        return [values[i:i + 2] for i in range(0, len(values), 2)]
+
+    def join(parts, gid):
+        out = []
+        for pts in parts:
+            if not out:
+                out.extend(pts)
+            elif all(abs(a - b) < 1e-9 for a, b in zip(out[-1], pts[0])):
+                out.extend(pts[1:])
+            else:
+                raise ValueError(f"{gid}: 曲线分段端点不连续")
+        if len(out) < 2:
+            raise ValueError(f"{gid}: 曲线至少需要两个点")
+        return out
+
     for e in root:
         gid = e.get(GML + "id")
         tag = local(e.tag)
         if tag == "Curve":
-            pos = e.find(f"{GML}segments/{GML}LineStringSegment/{GML}posList")
-            nums = [float(x) for x in (pos.text or "").split()]
-            curves[gid] = [[nums[i], nums[i + 1]] for i in range(0, len(nums), 2)]
+            segments = e.find(f"{GML}segments")
+            parts = []
+            for segment in segments if segments is not None else ():
+                pos = segment.find(f"{GML}posList")
+                if segment.tag != f"{GML}LineStringSegment" or pos is None:
+                    raise ValueError(f"{gid}: 仅支持带 posList 的 LineStringSegment")
+                parts.append(positions(pos, gid))
+            curves[gid] = join(parts, gid)
         elif tag == "OrientableCurve":
-            orient[gid] = (e.find(f"{GML}baseCurve").get(XLINK + "href")[1:],
-                           e.get("orientation", "+"))
+            sign = e.get("orientation", "+")
+            if sign not in ("+", "-"):
+                raise ValueError(f"{gid}: 无效的曲线方向 {sign!r}")
+            orient[gid] = (reference(e.find(f"{GML}baseCurve")), sign)
         elif tag == "CompositeCurve":
-            comp[gid] = [m.get(XLINK + "href")[1:] for m in e.findall(f"{GML}curveMember")]
+            comp[gid] = [reference(member) for member in e.findall(f"{GML}curveMember")]
         elif tag == "Surface":
-            patch = e.find(f"{GML}patches/{GML}PolygonPatch")
-            ext = patch.find(f"{GML}exterior/{GML}Ring/{GML}curveMember")
-            ints = patch.findall(f"{GML}interior/{GML}Ring/{GML}curveMember")
-            surf[gid] = (ext.get(XLINK + "href")[1:],
-                         [i.get(XLINK + "href")[1:] for i in ints])
+            patches = e.findall(f"{GML}patches/*")
+            if len(patches) != 1 or patches[0].tag != f"{GML}PolygonPatch":
+                raise ValueError(f"{gid}: 仅支持单个 PolygonPatch")
+            ext = patches[0].find(f"{GML}exterior/{GML}Ring")
+            interiors = patches[0].findall(f"{GML}interior")
+            rings = [ext] + [item.find(f"{GML}Ring") for item in interiors]
+            surf[gid] = [
+                [reference(member) for member in ring.findall(f"{GML}curveMember")]
+                if ring is not None else []
+                for ring in rings
+            ]
         elif tag == "Point":
             pos = e.find(f"{GML}pos")
-            nums = [float(x) for x in (pos.text or "").split()]
-            points[gid] = nums[:2]
+            coords = positions(pos, gid) if pos is not None else []
+            if len(coords) != 1:
+                raise ValueError(f"{gid}: 点几何需要一个坐标对")
+            points[gid] = coords[0]
 
-    def ring_of(cc_id):
-        """CompositeCurve → 坐标序列（按 orientation 决定是否反向）。
+    def curve_of(gid):
+        if gid in curves:
+            return curves[gid]
+        if gid in orient:
+            cid, sign = orient[gid]
+            return curves[cid] if sign == "+" else curves[cid][::-1]
+        return composites[gid]
 
-        多段拓扑曲线在 junction 处去除重复端点；使用 epsilon 容差
-        以防不同 Curve 段对同一 junction 坐标的文本精度不一致。
-        """
-        out = []
-        for oc_id in comp.get(cc_id, []):
-            c_id, sign = orient.get(oc_id, (None, "+"))
-            pts = list(curves.get(c_id, []))
-            if sign == "-":
-                pts.reverse()
-            if not out:
-                out.extend(pts)
-            elif out[-1] == pts[0] or (
-                abs(out[-1][0] - pts[0][0]) < 1e-9
-                and abs(out[-1][1] - pts[0][1]) < 1e-9
-            ):
-                out.extend(pts[1:])
-            else:
-                out.extend(pts)
-        return out
+    composites = {}
+    for gid, members in comp.items():
+        composites[gid] = join((curve_of(member) for member in members), gid)
 
-    geoms = {}
-    for sid, (ext, ints) in surf.items():
-        spec = {"type": "surface", "exterior": ring_of(ext)}
-        if ints:
-            spec["interiors"] = [ring_of(i) for i in ints]
-        geoms[sid] = spec
-    for ccid in comp:
-        if ccid not in {ext for ext, _ in surf.values()} and \
-           not any(ccid in ints for _, ints in surf.values()):
-            geoms[ccid] = {"type": "curve", "coordinates": ring_of(ccid)}
-    for pid, pos in points.items():
-        geoms[pid] = {"type": "point", "coordinates": pos}
+    geoms = {gid: {"type": "curve", "coordinates": curve_of(gid)}
+             for gid in (*curves, *orient, *composites)}
+    for sid, rings in surf.items():
+        coordinates = [join((curve_of(member) for member in ring), sid) for ring in rings]
+        for ring in coordinates:
+            if any(abs(a - b) >= 1e-9 for a, b in zip(ring[0], ring[-1])):
+                raise ValueError(f"{sid}: 面环未闭合")
+            ring[-1] = ring[0]
+        geoms[sid] = {"type": "surface", "exterior": coordinates[0]}
+        if len(coordinates) > 1:
+            geoms[sid]["interiors"] = coordinates[1:]
+    geoms.update({gid: {"type": "point", "coordinates": pos} for gid, pos in points.items()})
     return geoms
 
 
@@ -150,7 +181,7 @@ def parse_value(elem, type_name=None):
     return out
 
 
-def parse_feature(elem, geom_ids, ref_of):
+def parse_feature(elem, geom_ids, ref_of, assoc_objects):
     ftype = local(elem.tag)
     feat: dict = {"ref": ref_of[elem.get(GML + "id")], "type": ftype}
     attrs: dict = {}
@@ -161,10 +192,11 @@ def parse_feature(elem, geom_ids, ref_of):
         if name == "s100:featureObjectIdentifier":
             continue                              # 由构建器重新生成
         if name == "featureName":
-            item = {"language": None, "name": None}
-            d = parse_value(child)
-            item = {k: v for k, v in d.items()}
-            names.append(item)
+            item = parse_value(child)
+            name_elem = child.find(f"{{*}}name")
+            if isinstance(item, dict) and name_elem is not None:
+                item["name"] = name_elem.text or ""
+                names.append(item)
         elif name == "geometry":
             prop = list(child)[0]
             feat["geometry"] = geom_ids[prop.get(XLINK + "href")[1:]]
@@ -174,7 +206,12 @@ def parse_feature(elem, geom_ids, ref_of):
                     "本工具不支持，重建后会丢失")
         elif name in ASSOC_ELEMENTS:
             target = child.get(XLINK + "href")[1:]
-            assocs.append({"role": name, "target": ref_of.get(target, target)})
+            category = assoc_objects.get(target)
+            if category:
+                target, key, value = category
+                assocs.append({"role": name, "target": ref_of.get(target, target), key: value})
+            else:
+                assocs.append({"role": name, "target": ref_of.get(target, target)})
         elif name in ("fixedDateRange", "sourceIndication", "textContent"):
             val = parse_value(child)
             if name == "textContent":
@@ -212,21 +249,40 @@ def parse_feature(elem, geom_ids, ref_of):
     return feat
 
 
-def convert(path: Path) -> dict:
-    root = ET.parse(path).getroot()
-    geoms_by_id = parse_geometries(root)
+def dataset_members(root):
+    members = root.find("{*}members")
+    if members is None:
+        raise ValueError("未找到 S-127 Dataset/members")
+    return members
+
+
+def convert(path: Path, *, root=None, geoms_by_id=None) -> dict:
+    if root is None:
+        root = ET.parse(path).getroot()
+    if geoms_by_id is None:
+        geoms_by_id = parse_geometries(root)
 
     ident = root.find(f"{S100}DatasetIdentificationInformation")
     def ident_text(tag, default=None):
         e = ident.find(f"{S100}{tag}") if ident is not None else None
         return (e.text or "").strip() if e is not None else default
 
-    members = root.find("{http://www.iho.int/S127/gml/cs0/1.0}members") or root.find("members")
-    if members is None:
-        for e in root:
-            if local(e.tag) == "members":
-                members = e
-                break
+    members = []
+    assoc_objects = {}
+    for elem in dataset_members(root):
+        ftype = local(elem.tag)
+        if ftype == "PermissionType":
+            assoc_objects[elem.get(GML + "id")] = (
+                reference(elem.find("{*}permission")), "permission",
+                elem.findtext("{*}categoryOfRelationship"),
+            )
+        elif ftype == "InclusionType":
+            assoc_objects[elem.get(GML + "id")] = (
+                reference(elem.find("{*}isApplicableTo")), "inclusion",
+                elem.findtext("{*}membership"),
+            )
+        else:
+            members.append(elem)
 
     # gml:id → 可读 ref
     ref_of, seen = {}, {}
@@ -249,7 +305,7 @@ def convert(path: Path) -> dict:
             geom_ids[g] = key
             geoms[key] = geoms_by_id[g]
 
-    features = [parse_feature(e, geom_ids, ref_of) for e in members]
+    features = [parse_feature(e, geom_ids, ref_of, assoc_objects) for e in members]
 
     # 先记录「原件里本来就没有来源」的要素 —— 这才是可复用要素的判据。
     # 必须在上提 common 之前记录，否则上提会把所有要素都变成"没有来源"。
@@ -272,7 +328,9 @@ def convert(path: Path) -> dict:
         if actual_reusable != default_reusable:
             f["reusable"] = actual_reusable
 
-    name = ident_text("datasetTitle") or path.stem
+    identifier = ident_text("datasetFileIdentifier")
+    title = ident_text("datasetTitle")
+    name = Path(identifier).stem if identifier else title or path.stem
     doc = {
         "dataset": {
             "name": name,
@@ -282,6 +340,8 @@ def convert(path: Path) -> dict:
             "featureIdStart": 1,
         },
     }
+    if title and title != name:
+        doc["dataset"]["title"] = title
     # 还原 featureIdStart
     fins = []
     for e in members:

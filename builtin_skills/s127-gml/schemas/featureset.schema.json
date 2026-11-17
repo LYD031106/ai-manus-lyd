@@ -523,6 +523,10 @@
           "description": "该要素类的专有属性。枚举写 label，脚本自动补 code",
           "additionalProperties": true
         },
+        "geometryStatus": {
+          "const": "review",
+          "description": "已有几何为概位或勾绘结果，需用户确认或提供准确 GML"
+        },
         "geometry": {
           "type": "string",
           "description": "geometries 里的键名（仅地理要素）"

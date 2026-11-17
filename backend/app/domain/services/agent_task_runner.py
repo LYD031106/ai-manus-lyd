@@ -3,6 +3,10 @@ from contextlib import aclosing
 import asyncio
 import logging
 import os
+from pathlib import PurePosixPath
+import re
+import shlex
+from uuid import uuid4
 import debugpy
 from pydantic import TypeAdapter
 from app.domain.models.message import Message, LLMMessage, Role
@@ -382,6 +386,25 @@ class AgentTaskRunner(TaskRunner):
             yield ErrorEvent(error="No message")
             return
 
+        direct = re.fullmatch(r"S-?127\s+/(draft|complete|check)", message.message.strip(), re.IGNORECASE)
+        if direct:
+            action = direct.group(1).lower()
+            expected = {"draft": [".json"], "complete": [".gml", ".json"], "check": [".gml"]}[action]
+            if sorted(PurePosixPath(path).suffix.lower() for path in message.attachments) != expected:
+                yield ErrorEvent(error=f"S-127 /{action} 需要上传 {', '.join(expected)} 文件。")
+                return
+            directory = f"/home/ubuntu/s127-{uuid4().hex}"
+            event = await self._s127_result(action, directory, message.attachments)
+            if event:
+                yield event
+                yield DoneEvent()
+            else:
+                yield ErrorEvent(error="S-127 脚本未生成可交付的检查报告。")
+            return
+
+        if message.attachments and re.search(r"\bS[- ]?127\b|\bGML\b", message.message, re.IGNORECASE):
+            message.s127_checkpoint_dir = f"/home/ubuntu/s127-{uuid4().hex}"
+        delivered_draft = False
         async with aclosing(self._flow.run(message)) as flow:
             async for event in flow:
                 if isinstance(event, ToolEvent):
@@ -389,11 +412,67 @@ class AgentTaskRunner(TaskRunner):
                     await self._handle_tool_event(event)
                 elif isinstance(event, MessageEvent):
                     await self._sync_message_attachments_to_storage(event)
+                    delivered_draft |= any(
+                        (file.filename or "").lower().endswith(".draft.gml") for file in event.attachments or []
+                    )
+                elif isinstance(event, (DoneEvent, ErrorEvent)) and message.s127_checkpoint_dir and not delivered_draft:
+                    directory = message.s127_checkpoint_dir
+                    checkpoint = await self._s127_result("draft", directory, [f"{directory}/featureset-input.json"])
+                    if checkpoint:
+                        yield checkpoint
                 yield event
 
         logger.info(f"Agent {self._agent_id} completed processing one message")
 
     
+    async def _s127_result(self, action: str, directory: str, inputs: list[str]) -> MessageEvent | None:
+        """Run the fixed workflow and publish its files without another model turn."""
+        report = f"{directory}/report.md"
+        result = f"{directory}/S127.gml"
+        json_path = f"{directory}/featureset.json"
+        assoc_path = f"{directory}/associations.csv"
+        inputs = sorted(inputs, key=lambda path: PurePosixPath(path).suffix.lower() != ".json")
+        script = "/opt/skills/s127-gml/scripts/geometry_workflow.py"
+        args = ["timeout", "20", "python3", script, action, *inputs, "--report", report, "--bridge-profile"]
+        if action != "check":
+            args += ["-o", result, "--featureset-out", json_path, "--assoc-csv", assoc_path]
+        candidates = [report, result, f"{directory}/S127.draft.gml", json_path, assoc_path]
+        outputs = " ".join(shlex.quote(path) for path in candidates)
+        command = (
+            f"mkdir -p -- {shlex.quote(directory)} && "
+            + " && ".join(f"test -s {shlex.quote(path)}" for path in inputs)
+            + f" && {{ {shlex.join(args)}; for f in {outputs}; do "
+            + 'if test -s "$f"; then printf "S127_ARTIFACT %s\\n" "$f"; fi; done; }'
+        )
+        shell_id = uuid4().hex
+        try:
+            run = await self._sandbox.exec_command(shell_id, "/home/ubuntu", command)
+            data = run.data or {}
+            if run.success and data.get("status") == "running":
+                await self._sandbox.wait_for_process(shell_id, seconds=22)
+                run = await self._sandbox.view_shell(shell_id)
+                data = run.data or {}
+            if not run.success:
+                return None
+            paths = {line.removeprefix("S127_ARTIFACT ").strip()
+                     for line in (data.get("output") or "").splitlines() if line.startswith("S127_ARTIFACT ")}
+            if report not in paths:
+                return None
+            if action == "check":
+                summary = "S-127 检查报告已生成，请查看附件中的检查结论。"
+            elif result in paths:
+                summary = "已生成补录后的 S-127 GML，请查看附件。"
+            elif f"{directory}/S127.draft.gml" in paths:
+                summary = "已交付 S-127 草稿。几何缺失或待确认项见附件报告。"
+            else:
+                summary = "S-127 校验发现问题，详情见附件报告。"
+            event = MessageEvent(message=summary, attachments=[FileInfo(file_path=path) for path in candidates if path in paths])
+            await self._sync_message_attachments_to_storage(event)
+            return event if event.attachments else None
+        except Exception:
+            logger.exception("Unable to publish S-127 workflow files for agent %s", self._agent_id)
+            return None
+
     async def on_done(self, task: Task) -> None:
         """Called when the task is done"""
         logger.info(f"Agent {self._agent_id} task done")
