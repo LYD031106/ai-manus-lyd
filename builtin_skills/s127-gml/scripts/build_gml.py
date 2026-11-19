@@ -372,7 +372,7 @@ def build(doc: dict, assoc_objects: bool = False, *, draft: bool = False):
     ds = doc.get("dataset") or {}
     name = ds.get("name")
     if not name:
-        raise ValueError("dataset.name 必填（如 127CN00PTWRVEW001）")
+        raise ValueError("dataset.name 必填（由本次交付的数据集标识确定）")
     common = doc.get("common") or {}
     features = doc.get("features") or []
     if not features:

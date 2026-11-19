@@ -48,13 +48,9 @@ CARIS 导出时没有遵守这一点（可能用的是另一版 schema）。
 |---|---|---|
 | 符合 S127.xsd sequence | **是** | 否 |
 | 与 13 个已入库数据集版式一致 | 否 | **是**（实测逐元素一致） |
-| 生产系统能否接受 | 极可能（见下） | 已验证 |
+| 交付条件 | 用项目 XSD 校验 | 历史续编或目标明确要求并已验证兼容时使用 |
 
-**为什么默认选 xsd**：生产系统接受了违反 XSD 顺序的 CARIS 数据，说明它没做严格顺序校验；
-既然如此，符合标准的顺序同样会被接受，而且额外满足了规范。
-**什么时候用 caris**：要和历史归档 GML 做逐行 diff，或续编同一个数据集。
-
-> 如果导入时真的因顺序报错，切 `--order caris` 重出即可，要素清单不用改。
+默认按项目采用的 XSD 排序。历史 GML 续编、逐元素比对或目标环境明确要求 CARIS 顺序时可用兼容模式；导入结论以目标系统实测为准。切换顺序无需修改要素清单。
 
 ---
 
@@ -84,17 +80,13 @@ python scripts/roundtrip_check.py '示例/**/*.gml'   # 内部开发用脚本，
    xlink:href="#c72" xlink:role="suppressed"/></s100:surfaceProperty>`，
    用于抑制部分边界的显示。**本构建器不支持**，需要时只能在 CARIS 里补。
 
-**几何分段不算差异**：生产文件一个环常由很多 `Curve` 段拼成
-（宁德 VTS：1018 个 Curve 拼 54 个 CompositeCurve，其中一个环含 628 段），
-本构建器一个环出 1 段。解析后的坐标序列完全相同，图元数量不同而已。
+几何分段属于序列化差异。应比对按顺序展开的坐标、内外环和方向，并单独记录共享边、遮罩等可能影响后续编辑或展示的结构。
 
 ---
 
 ## 零点八、posList 坐标数差异（拓扑编码 vs 平面编码）
 
-CARIS 产出的 GML 使用**拓扑几何编码**，本构建器使用**平面几何编码**。
-两种编码的空间几何完全等价（形状/坐标一致），仅 GML 文件中 `posList` 的数量
-和总坐标对数有差异。**这不是错误，不影响系统导入和数据正确性。**
+CARIS 可用共享拓扑表示边界，本构建器用展开的平面图元。先核对展开后的坐标及内外环，其次核对共享边、方向和遮罩是否影响交付。`posList` 的个数和坐标对总数只用于诊断差异；系统兼容性由目标环境导入验证。
 
 ### 两种编码模式对比
 
@@ -112,17 +104,7 @@ CARIS 产出的 GML 使用**拓扑几何编码**，本构建器使用**平面几
 CARIS 把一个环拆成 N 段 Curve，相邻两段在连接点（junction）处各存一份坐标。
 `gml_to_featureset.py` 拼接时去除重复的连接点（`pts[1:]`），结果每个环减少 (N-1) 个点。
 
-实测验证：
-
-| 案例 | 原始段数→环数 | 理论去除 junction | 实际差(原-建) |
-|---|---|---|---|
-| 宁德 VTS | 1020→54 | 966 | **962** ✓ |
-| 厦门桥区 | 34→15 | 19 | **19** ✓ |
-| 珠江口定线制 | 86→26 | 60 | **38** |
-| 渔船航路 | 39→7 | 32 | **22** |
-
-宁德和厦门精确吻合。珠江口/渔船航路差值偏小，原因是 `build_gml.py` 的
-`close_ring()` 为未闭合的环补回了首尾点。
+只去除首尾重复的连接点；对于原始未闭合的外环，闭合处理可能增加一个坐标。
 
 **机制 B：OC 共享边界展开（重建后坐标变多）**
 
@@ -130,28 +112,7 @@ CARIS 把一个环拆成 N 段 Curve，相邻两段在连接点（junction）处
 引用——坐标只存一份。`gml_to_featureset.py` 为每个环独立拼接，共享段的坐标被
 复制到每个引用方，导致重建后坐标总量增加。
 
-实测验证：
-
-| 案例 | 共享 OC 数 | 共享段坐标对 | 理论额外复制 | 实际差(建-原) |
-|---|---|---|---|---|
-| 天津交管 | 15 | 4,664 | 6,188 | **+6,084** ✓ |
-| 宁德 VTS | 2 | 4 | 4 | (被机制A抵消) |
-
-天津案例误差 ~100 对（6188-6084），由 junction 去重抵消。
-
-### 何时无差异
-
-当原始 GML 本身就是平面编码（每环 1 段、无共享）时，posList 数和坐标总数完全一致：
-
-- 商渔船碰撞风险区（天津）：8 posList / 395 坐标对 — 完全匹配
-- 沿海公共航路（丹东大连）：3 posList / 17 坐标对 — 完全匹配
-- 避险区域（平潭）：6 posList / 51 坐标对 — 完全匹配
-
-### 结论
-
-- **不需要实现拓扑构建器**：平面编码是合法的 S-100 GML，导入系统接受
-- **对比工具应忽略 posList 数量差异**：只对比几何形状（坐标序列去重后比较）
-- **有拓扑复杂度的案例**：VTS 类数据集最常见，因为 VTS 子分区天然共享边界
+核对几何时，以同一对象展开后的点序、内外环、方向和范围为准。共享边的展开会增加坐标数，环段合并会减少 posList 数。原始数据要求保留共享拓扑或遮罩时，按目标工具能力单独审核。
 
 ---
 
@@ -195,7 +156,7 @@ CARIS 把一个环拆成 N 段 Curve，相邻两段在连接点（junction）处
 ### 坐标参考系
 
 `srsName="http://www.opengis.net/def/crs/EPSG/0/4326"`，
-**轴序为「纬度 经度」**。`posList` 里写 `25.5915 119.6846667` —— 纬度在前。
+**轴序为「纬度 经度」**。`posList` 里写 `12.1 41.0` —— 纬度在前。
 
 ---
 
@@ -212,7 +173,7 @@ S-127 不直接用 GML 的 Polygon/LineString，而是走 S-100 的图元链：
 ```xml
 <s100:Curve srsName="…" gml:id="c1">
   <gml:segments><gml:LineStringSegment>
-    <gml:posList>25.5915 119.6846667 25.5905 119.6896667 … 25.5915 119.6846667</gml:posList>
+    <gml:posList>12.1 41.0 12.2 41.1 … 12.1 41.0</gml:posList>
   </gml:LineStringSegment></gml:segments>
 </s100:Curve>
 <s100:OrientableCurve srsName="…" gml:id="oc1" orientation="+">
@@ -262,7 +223,7 @@ CARIS 导出时会因内部拓扑写出 `+` 或 `-`（语料中两者都大量�
 ```xml
 <s100:featureObjectIdentifier>
   <s100:agency>CN</s100:agency>
-  <s100:featureIdentificationNumber>868</s100:featureIdentificationNumber>
+  <s100:featureIdentificationNumber>1</s100:featureIdentificationNumber>
   <s100:featureIdentificationSubdivision>1</s100:featureIdentificationSubdivision>
 </s100:featureObjectIdentifier>
 ```
@@ -277,8 +238,8 @@ FIN 由 `dataset.featureIdStart` 起递增。**同一发布体系内 FIN 不应�
 「先英文后中文」在 GML 里是**一个元素内用 CR 分隔**（不是两个元素）：
 
 ```xml
-<source>Fujian Navigational Notice No.0438/2025&#13;
-闽航通〔2025〕0438号</source>
+<source>English document identifier&#13;
+同一文件的中文标识</source>
 ```
 
 `&#13;` 是回车（CR）的实体转义。**必须转义** —— 直接写裸 CR 会在 XML 解析时被
@@ -287,8 +248,8 @@ FIN 由 `dataset.featureIdStart` 起递增。**同一发布体系内 FIN 不应�
 而 `featureName` 与 `information` 是**两个独立元素**，各带 `language`：
 
 ```xml
-<featureName><language>eng</language><name>PINGTAN MSA</name></featureName>
-<featureName><displayName>true</displayName><language>zho</language><name>平潭海事局</name></featureName>
+<featureName><language>eng</language><name>Authority Example</name></featureName>
+<featureName><displayName>true</displayName><language>zho</language><name>主管机构示意</name></featureName>
 ```
 
 ---

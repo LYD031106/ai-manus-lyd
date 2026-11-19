@@ -503,7 +503,7 @@ categoryOfNavigationLine 未填写
 | --- | --- | --- | --- | --- | --- | --- | --- |
 
 - 要素类取 `features[].type`，中文与英文名称分别按 `zho`、`eng` 提取，缺失语言留空。
-- FIN 对应同一份要素清单本次构建的 GML。默认从 `dataset.featureIdStart` 开始，只对地理要素依序递增，分区为 `1`，显示例如 `868-1`。显式指定的 `attributes["s100:featureObjectIdentifier"]` 按其实际编号及分区显示。信息要素显示 `---`。历史 GML 反解可能无法保留原始不连续编号，核对历史 FIN 时应读取原 GML。
+- FIN 对应同一份要素清单本次构建的 GML。默认从 `dataset.featureIdStart` 开始，只对地理要素依序递增，分区默认使用 `1`，显示格式为 `编号-分区`。显式指定的 `attributes["s100:featureObjectIdentifier"]` 按其实际编号及分区显示。信息要素显示 `---`。历史 GML 反解可能无法保留原始不连续编号，核对历史 FIN 时应读取原 GML。
 - 编码信息汇总 `features[].attributes` 中的专有属性。枚举查目录后显示为 `restriction=3(fishing prohibited)` 等格式。多值使用分号和单元格内换行，嵌套复合属性保留路径，重复的复合实例保留索引。布尔值显示 `true` 或 `false`，其他值保留实际内容。表中代码与本次 GML 输出一致，目录子集差异另在检查报告说明。
 - 有效期起、有效期止取本次构建实际采用的 `fixedDateRange.dateStart` 和 `dateEnd`。完整日期采用 `YYYY-MM-DD`，没有依据时留空。
 - 来源取本次构建实际采用的 `sourceIndication.source`，双语来源按先英后中展示。

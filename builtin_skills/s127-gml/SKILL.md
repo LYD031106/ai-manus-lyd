@@ -109,7 +109,7 @@ python3 $S/parse_office.py /home/ubuntu/upload/*.pdf /home/ubuntu/upload/*.docx 
 
 读 `解析-local.md` 里的 `>` 提示行 —— 脚本会明确写出「已导出以下图片，请用
 parse_regulation 解析」或「全为装饰图，无需调用」。图片按 ≥150×150 过滤，
-公文里的印章碎片、页面图标不会送模型（珠江口那份就有 802 张小图）。
+公文里的印章碎片、页面图标可在没有资料内容时过滤；涉及边界、坐标或条款的图件应保留检查。
 
 ```
 # 只传上一步导出的 PNG —— 本工具只收图片，PDF/Word 传进去会被拒
@@ -317,7 +317,7 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 | 待闸锚地 / 枢纽水域限速 | `RestrictedAreaNavigational`，`restriction=speed restricted` |
 | 禁鸣时段水域 | `RestrictedAreaNavigational`（`restriction` 不填，textContent 填时段） |
 | 前后船安全距离 / 避让规则 | `WaterwayArea` + `dynamicResource=static` |
-| 富余水深数值 | `UCAA`，`underkeelAllowance` 填 `underkeelAllowanceFixed` + `operation=smallest value` |
+| 富余水深数值 | `UCAA`，在 `underkeelAllowance` 区分固定值与按船宽或吃水计算的值；`operation` 按原文的取值方式填写 |
 | 内河航道通航安全管理规定 | 见 `references/05-专题配方.md` §10（内河航道选型） |
 
 ### ④ 编码属性
@@ -391,12 +391,12 @@ ERROR 必须清零，逐条核对 WARN。即使 XML 可解析，仍要单列缺�
 | 返工问题 | 正确做法 |
 |---|---|
 | textContent 与 ShipReport 内容重复 | 报告格式、报告内容、报告时机等**只通过 ShipReport 表达**，不在地理要素的 textContent 里重复 |
-| Authority 重复创建 | 同一机构（如「福建海事局」「天津海事局」）全数据集**只建一个**，所有要素共用关联 |
-| ContactDetails 缺 language 属性 | 中文联系方式和英文联系方式**各建一条**，必须填 `"language": "zho"` 或 `"eng"` |
+| Authority 重复创建 | 核实机构身份及适用范围；同一机构可复用，由各要素按实际监管关系关联 |
+| ContactDetails 缺 language 属性 | 按来源提供的联系语言及实际渠道建记录，填写对应 `language`；确需为交付翻译说明时区分说明语言与受理语言 |
 | 英文名称未首字母大写 | 每个实词首字母大写：`Ningde VTS Report Line`，非 `ningde vts report line` |
 | VHF 内容写在 textContent 里 | VHF 频道填对应要素的 `communicationChannel` 属性或 `requirementsForMaintenanceOfListeningWatch`；详细通信信息填 ContactDetails 的 `telecommunications` |
-| Applicability 合并为一条 | 每个船舶类别**各建一条**独立的 Applicability（如「客船」「危险品船舶」「300总吨及以上中国籍船舶」各一条） |
-| 关联了不存在的系统实体 | 只关联本数据集内定义的要素。需要关联系统已有实体的（如 ServiceHours「24小时值班」），在记录表「来源」格批注标「系统内关联」 |
+| Applicability 分组错误 | 保留原文的船型、限制条件和 AND/OR；按语义和目录容量决定合并、拆分或复用，无法确认逻辑时列入复核 |
+| 关联了不存在的系统实体 | GML 内部关联指向本数据集已有要素；确有等同系统实体且允许在目标系统内另行关联时，在记录表标明该安排 |
 | 几何范围与文字描述不符 | 优先以 ENC 和海图为准勾绘；文字描述只作验证参考 |
 
 ### ⑦ 导入与存档
@@ -417,14 +417,14 @@ ERROR 必须清零，逐条核对 WARN。即使 XML 可解析，仍要单列缺�
 | 渔船推荐航路 | `FVRR` | `127CN00TJFVRR001` |
 | 碰撞高风险警示区 | `PA` / `HCRA` | `127CN00TJHCRA01` |
 | 船舶安全监督规则 | `SSSR` | `127CN00SZ_SSSR001` |
-| 桥区水域 | `BA` | `127CN00XMBA002` |
-| 避险推荐水域 | `WRVEW` | `127CN00PTWRVEW001` |
+| 桥区水域 | `BA` | `127CN00XXBA001` |
+| 避险推荐水域 | `WRVEW` | `127CN00XXWRVEW001` |
 | 内河航道通航安全管理规定 | `<航道简称>` | `127CN00XXCANAL001` |
 
 ## 要素清单 JSON 结构
 
 从空白骨架 `templates/featureset.skeleton.json` 开始，经核对后写入这次实际要素。
-历史回归样例仅用于验证文件构建，不能作为新任务的规则或素材。
+本技能的字段示意仅用于说明结构；生产字段、码值、关联和分片数量按本次有出处的事实生成。
 字段约定：`schemas/featureset.schema.json`。S-127 权威 schema：`schemas/S127.xsd`。
 
 ```jsonc
@@ -495,7 +495,7 @@ RadioCallingInPoint
 | `references/07-审核检查清单.md` | 交付前自检、判断某条文是否该表达、避开已知返工点与生产数据已知缺陷 |
 | `references/08-字段抽取标注规范.md` | 各字段的抽取级别（必抽/条件抽/按需/慎用）、完整枚举代码表、特殊说明 |
 | [references/09-UML结构与文本抽取规则.md](references/09-UML结构与文本抽取规则.md) | 原文抽取及输出结果前；查 UML 继承、基数、复合属性结构、JSON 输出映射及 §8.5 八列表格规则 |
-| [references/10-地理要素含义与适用范围.md](references/10-地理要素含义与适用范围.md) | 选择地理要素类前；查候选类含义、适用与排除范围、相近类区别和案例 |
+| [references/10-地理要素含义与适用范围.md](references/10-地理要素含义与适用范围.md) | 选择地理要素类前；查候选类含义、适用与排除范围、相近类区别和判断条件 |
 | [references/11-信息要素含义与适用范围.md](references/11-信息要素含义与适用范围.md) | 选择信息要素类前；查候选类含义、适用范围、继承字段和关联要求 |
 | `schemas/S127.json` | 每个要素类的完整字段模板（给模型的输出格式参考） |
 
