@@ -23,6 +23,19 @@ description: >-
 
 要素目录换版后重跑 `python3 /opt/skills/s127-gml/scripts/gen_s127_catalogue.py` 即可，不要手改生成物。
 
+## 结果表格格式
+
+回复中的要素结果表及导出的 Excel、CSV 统一使用以下八列，列名和顺序固定，每个要素一行：
+
+| 要素类 | FIN | 中文名称 | 英文名称 | 编码信息 | 有效期起 | 有效期止 | 来源 |
+|---|---|---|---|---|---|---|---|
+
+地理要素 FIN 与本次构建的 GML 编号一致（如 `2225-1`），信息要素显示 `---`。
+编码信息采用 `字段=代码(枚举标签)`（如 `restriction=3(fishing prohibited)`），多项以分号及单元格内换行分隔；
+非枚举值保留实际内容。有效期完整日期使用 `YYYY-MM-DD`，缺少依据的名称、日期和来源留空。
+Excel 使用蓝底白字表头、正文自动换行和细边框。字段取值、公共属性继承、来源批注及完整格式规则见
+[09-UML结构与文本抽取规则.md §8.5](references/09-UML结构与文本抽取规则.md#85-结果表格)。
+
 ## 核心原则：不要手写 GML
 
 GML 的命名空间、几何图元链、`gml:id` 串联、`boundedBy`、`xlink:arcrole`
@@ -48,8 +61,8 @@ GML 一律由脚本生成。根据上传件和用户意图选择阶段，可在�
 
 **在写 `featureset.json` 之前，先按公告/附件逐条列出 `/home/ubuntu/要素清单.md`：**
 
-| 序号 | 要素类 | 数量 | 中文名 | 英文名 | 几何类型 | 来源条款 |
-|---|---|---|---|---|---|---|
+清单使用上面的八列表格，每个独立要素占一行。构建前尚未确定的地理要素 FIN 留空，构建后回填实际值；
+几何类型、按公告逐条核对的数量及条款证据保留在清单附注中。
 
 硬规则：
 
@@ -248,7 +261,11 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
      → 建 Regulations / Restrictions 信息要素再关联
    - 直属海事局及以上发文 → `Regulations`；地方海事局及同级 → `Restrictions`
 
-要素类的选型判断表在 `references/02-要素字典.md`。几个最容易错的：
+选择具体类前，先按候选类型阅读
+[10-地理要素含义与适用范围.md](references/10-地理要素含义与适用范围.md) 或
+[11-信息要素含义与适用范围.md](references/11-信息要素含义与适用范围.md)
+的使用说明及对应类章节，核对要素含义、适用范围、排除情形和相近类区别。
+再用 `references/02-要素字典.md` 核对必填项、几何和关联约束。几个最容易错的：
 | 条文特征 | 正确要素 |
 |---|---|
 | 「禁止会遇」 | `WaterwayArea`（**不是**限制区） |
@@ -267,6 +284,10 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 | 内河航道通航安全管理规定 | 见 `references/05-专题配方.md` §10（平陆运河参照配方） |
 
 ### ④ 编码属性
+从原文抽取字段前，阅读 [09-UML结构与文本抽取规则.md](references/09-UML结构与文本抽取规则.md)，
+按继承链、基数和复合属性结构组织数据，并结合 `references/08-字段抽取标注规范.md` 核对字段级要求。
+`featureset.json`、证据和待补项的分离及项目字段映射见 09 §8；字段、枚举和基数仍以本技能采用的目录与 Schema 为准。
+
 - 一律**先英文后中文**；复合属性里的 `language` 用 ISO 639-3（`eng` / `zho`）
 - 单值文本属性写成 `["English text", "中文文本"]`，脚本会用 CR 连成一格
 - `featureName` 写成 `{"eng": "...", "zho": "..."}`，脚本按规则补 `displayName`
@@ -324,6 +345,7 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 
 ### ⑥ 生成与自检
 按当前阶段运行 `geometry_workflow.py`。初始编码和补录时同时运行 `make_record_table.py`。
+回复中的要素结果表与记录表保持相同的八列、要素顺序和字段值；完整规则见 09 §8.5。
 ERROR 必须清零，逐条核对 WARN。即使 XML 可解析，仍要单列缺几何、概位和受影响的关联。
 交付前对照 `references/07-审核检查清单.md` 走一遍。
 
@@ -339,7 +361,7 @@ ERROR 必须清零，逐条核对 WARN。即使 XML 可解析，仍要单列缺�
 | 英文名称未首字母大写 | 每个实词首字母大写：`Ningde VTS Report Line`，非 `ningde vts report line` |
 | VHF 内容写在 textContent 里 | VHF 频道填对应要素的 `communicationChannel` 属性或 `requirementsForMaintenanceOfListeningWatch`；详细通信信息填 ContactDetails 的 `telecommunications` |
 | Applicability 合并为一条 | 每个船舶类别**各建一条**独立的 Applicability（如「客船」「危险品船舶」「300总吨及以上中国籍船舶」各一条） |
-| 关联了不存在的系统实体 | 只关联本数据集内定义的要素。需要关联系统已有实体的（如 ServiceHours「24小时值班」），在记录表备注栏标「系统内关联」 |
+| 关联了不存在的系统实体 | 只关联本数据集内定义的要素。需要关联系统已有实体的（如 ServiceHours「24小时值班」），在记录表「来源」格批注标「系统内关联」 |
 | 几何范围与文字描述不符 | 优先以 ENC 和海图为准勾绘；文字描述只作验证参考 |
 
 ### ⑦ 导入与存档
@@ -426,6 +448,9 @@ RadioCallingInPoint
 
 ## 参考资料（按需读，不要一次全读）
 
+长文先按标题或要素类名定位，再用 `file_read` 的 `start_line` / `end_line` 分段读取；
+若返回含 `(truncated)`，继续读取后续行，确保所需章节完整。
+
 | 文件 | 什么时候读 |
 |---|---|
 | `references/01-通用编码规则.md` | 编 language / fixedDateRange / featureName / sourceIndication / textContent |
@@ -436,6 +461,9 @@ RadioCallingInPoint
 | `references/06-GML结构与几何.md` | 理解脚本输出、排查导入失败、核对几何；**XSD 状况、顺序之争、保真度实测、拓扑/平面编码差异说明** |
 | `references/07-审核检查清单.md` | 交付前自检、判断某条文是否该表达、避开已知返工点与生产数据已知缺陷 |
 | `references/08-字段抽取标注规范.md` | 各字段的抽取级别（必抽/条件抽/按需/慎用）、完整枚举代码表、特殊说明 |
+| [references/09-UML结构与文本抽取规则.md](references/09-UML结构与文本抽取规则.md) | 原文抽取及输出结果前；查 UML 继承、基数、复合属性结构、JSON 输出映射及 §8.5 八列表格规则 |
+| [references/10-地理要素含义与适用范围.md](references/10-地理要素含义与适用范围.md) | 选择地理要素类前；查候选类含义、适用与排除范围、相近类区别和案例 |
+| [references/11-信息要素含义与适用范围.md](references/11-信息要素含义与适用范围.md) | 选择信息要素类前；查候选类含义、适用范围、继承字段和关联要求 |
 | `schemas/S127.json` | 每个要素类的完整字段模板（给模型的输出格式参考） |
 
 ## 边界
