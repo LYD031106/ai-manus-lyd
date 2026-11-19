@@ -53,13 +53,13 @@
         },
         "sourceIndication": {
           "$ref": "#/definitions/sourceIndication"
+        },
+        "reportedDateBasis": {
+          "type": "string",
+          "minLength": 1,
+          "description": "可核对的发文日期出处，如通告签署页；不写入 GML"
         }
       }
-    },
-    "productionProfile": {
-      "type": "string",
-      "enum": ["yangshan-announcement-16-2026"],
-      "description": "仅供匹配 2026 年第 16 号公告的洋山法规使用"
     },
     "geometries": {
       "type": "object",
@@ -528,6 +528,30 @@
           "description": "该要素类的专有属性。枚举写 label，脚本自动补 code",
           "additionalProperties": true
         },
+        "sourceBasis": {
+          "type": "object",
+          "required": ["kind", "reference"],
+          "description": "条文提取阶段记录的事实，供构建前检查；不写入 GML",
+          "properties": {
+            "kind": {"enum": ["regulated-fairway", "bridge-waters", "bridge-information", "routeing-measure", "reporting-obligation"]},
+            "reference": {"type": "string", "minLength": 1},
+            "partitionGroup": {"type": "string", "minLength": 1, "description": "原文或海图明确需要独立几何时使用的分组；不是按名称猜测"},
+            "verticalClearance": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": false,
+                "properties": {"eng": {"type": "string"}, "zho": {"type": "string"}}
+              }
+            }
+          }
+        },
+        "reportedDateBasis": {
+          "type": "string",
+          "minLength": 1,
+          "description": "该要素的独立来源所标明的发布日期出处；不写入 GML"
+        },
         "geometryStatus": {
           "const": "review",
           "description": "已有几何为概位或勾绘结果，需用户确认或提供准确 GML"
@@ -537,8 +561,13 @@
           "required": ["kind", "reference"],
           "properties": {
             "kind": {"enum": ["enc", "source-boundary", "source-circle", "chart-trace", "user-gml"]},
-            "reference": {"type": "string", "minLength": 1}
-          }
+            "reference": {"type": "string", "minLength": 1},
+            "reviewReference": {"type": "string", "minLength": 1, "description": "人工确认后添加的复核依据；候选生成工具不会写入"},
+            "center": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}, "description": "原文圆心，顺序为纬度、经度"},
+            "radiusMetres": {"type": "number", "exclusiveMinimum": 0, "maximum": 100000}
+          },
+          "if": {"properties": {"kind": {"const": "source-circle"}}},
+          "then": {"required": ["center", "radiusMetres"]}
         },
         "geometry": {
           "type": "string",

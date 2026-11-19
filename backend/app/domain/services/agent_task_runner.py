@@ -441,7 +441,7 @@ class AgentTaskRunner(TaskRunner):
         record_path = f"{directory}/S127-record.xlsx"
         inputs = sorted(inputs, key=lambda path: PurePosixPath(path).suffix.lower() != ".json")
         script = "/opt/skills/s127-gml/scripts/geometry_workflow.py"
-        args = ["timeout", "20", "python3", script, action, *inputs, "--report", report, "--bridge-profile"]
+        args = ["timeout", "20", "python3", script, action, *inputs, "--report", report]
         if action != "check":
             args += ["-o", result, "--featureset-out", json_path, "--assoc-csv", assoc_path, "--record", record_path]
         for match in mapping or []:

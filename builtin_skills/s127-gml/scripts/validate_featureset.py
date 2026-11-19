@@ -25,12 +25,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import yangshan_profile
 import sys
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import source_rules
 
 from s127_model import (  # noqa: E402
     ALL_FEATURES,
@@ -178,21 +179,8 @@ def check_against_catalogue(where: str, ftype: str, present: dict) -> None:
                         f'"{name}": {{"$nil": true}}（显式空值），而不是整个省略')
 
 
-def bridge_area(feature):
-    if feature.get("type") != "RestrictedAreaNavigational":
-        return False
-    names = feature.get("featureName") or {}
-    if isinstance(names, list):
-        names = {item.get("language"): item.get("name") for item in names}
-    return bool(
-        re.search(r"桥(?:区(?:安全)?水域|.{0,12}通航孔航道)", names.get("zho") or "")
-        or re.search(r"\bbridge\b.*(?:safety water|bridge area|navigable span|navigation opening)",
-                     names.get("eng") or "", re.IGNORECASE)
-    )
-
-
 def check_enums(where: str, node, owner: str | None = None, ftype: str | None = None,
-                *, bridge_profile: bool = False) -> None:
+                *, allow_restriction_3: bool = False) -> None:
     """枚举取值合法性 + 该要素类允许的枚举子集（要素目录 permittedValues）。"""
     if isinstance(node, dict):
         for key, value in node.items():
@@ -202,7 +190,7 @@ def check_enums(where: str, node, owner: str | None = None, ftype: str | None = 
                 for item in (value if isinstance(value, list) else [value]):
                     try:
                         code, _ = resolve_enum(key, item)
-                        if (bridge_profile and owner is None and ftype == "RestrictedAreaNavigational"
+                        if (allow_restriction_3 and owner is None and ftype == "RestrictedAreaNavigational"
                                 and key == "restriction" and code == 3):
                             warn(f"{where}/{key}", "项目兼容项：fishing prohibited (3) "
                                  "超出 S127FC 航行限制区允许的子集，需核对适用条文和目标系统")
@@ -450,11 +438,10 @@ def check_geometry(name: str, spec: dict) -> str | None:
 
 # ---------------------------------------------------------------------------
 
-def validate(doc: dict, *, bridge_profile: bool = False) -> None:
+def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
     errors.clear()
     warns.clear()
     check_dataset(doc.get("dataset") or {})
-    yangshan = yangshan_profile.applies(doc)
 
     common = doc.get("common") or {}
     if "fixedDateRange" in common:
@@ -488,6 +475,8 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
                     if f.get("type") in {"VesselTrafficServiceArea", "ShipReportingServiceArea"}]
     area_reports = {a.get("target") for area in report_areas
                     for a in (area.get("associations") or []) if a.get("role") == "reptForTrafficServ"}
+    geographically_linked = {a.get("target") for feat in features if feat.get("type") in GEOGRAPHIC_FEATURES
+                             for a in feat.get("associations", []) if a.get("role") == "theRxN"}
     used_geoms: set[str] = set()
 
     for ref, feat in refs.items():
@@ -548,8 +537,29 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
             warn(where, "专属要素应有 sourceIndication（可放在 common 里共用，指南 4.3/5.1）")
 
         # ---- 属性内部结构与枚举 ----
-        allow_profile_code = bridge_profile and (bridge_area(feat) or yangshan_profile.fishing_allowed(feat, yangshan))
-        check_enums(where, attrs, ftype=ftype, bridge_profile=allow_profile_code)
+        check_enums(where, attrs, ftype=ftype, allow_restriction_3=allow_restriction_3)
+        info = source_rules.basis(feat)
+        kind = info.get("kind")
+        if "sourceBasis" in feat:
+            if kind not in source_rules.KINDS or not source_rules.has_text(info.get("reference")):
+                err(where, "sourceBasis 需要有效的条文用途及可核对的出处")
+            elif kind in source_rules.AREA_KINDS and ftype != "RestrictedAreaNavigational":
+                err(where, "该条文用途应以航行限制区表达")
+            elif kind == "routeing-measure" and ftype != "RouteingMeasure":
+                err(where, "原文明示的航路措施应使用相应的 RouteingMeasure 类和类别")
+            elif kind == "reporting-obligation":
+                if ftype not in {"Regulations", "Restrictions"}:
+                    err(where, "法规中的报告义务应使用 Regulations 或 Restrictions；不能直接当作 ShipReport")
+                else:
+                    if not feat.get("textContent") and not attrs.get("textContent"):
+                        err(where, "报告义务须保留条文内容")
+                    if ref not in geographically_linked:
+                        err(where, "报告义务缺少相应地理要素的 theRxN；几何可待补，关联应保留")
+                    if not any(a.get("role") == "isApplicableTo" and a.get("inclusion") == "included"
+                               and refs.get(a.get("target"), {}).get("type") == "Applicability" for a in assocs):
+                        err(where, "报告义务须关联适用对象 Applicability，包含关系用 included")
+        elif ftype == "RouteingMeasure":
+            warn(where, "请核对源文明确的航路措施类型，勿把普通航道默认标为 fairway system")
         for key, value in attrs.items():
             if is_bilingual_shorthand(key, value):
                 continue
@@ -616,7 +626,7 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
                 if kind == "surface" and ftype in {"RestrictedAreaNavigational", "RouteingMeasure", "AnchorageArea"}:
                     shape = geoms[gname]
                     ring = shape.get("exterior") or shape.get("coordinates") or []
-                    threshold = 24 if (feat.get("geometryEvidence") or {}).get("kind") == "source-circle" else 8
+                    threshold = 24 if source_rules.geometry_evidence(feat).get("kind") == "source-circle" else 8
                     points = {str(point[:2]) for point in ring if isinstance(point, (tuple, list)) and len(point) >= 2}
                     if len(points) < threshold:
                         warn(where, f"几何精度复核：外环少于 {threshold} 个不同顶点；请核对法规边界、海图或圆形参数。"
@@ -705,11 +715,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="S-127 要素清单校验")
     ap.add_argument("featureset")
     ap.add_argument("--strict", action="store_true", help="把 WARN 也当作失败")
-    ap.add_argument("--bridge-profile", action="store_true", help="按桥区项目反馈将 restriction=3 的目录差异列为告警")
+    ap.add_argument("--allow-restriction-3", "--bridge-profile", action="store_true",
+                    help="显式采用项目兼容口径：航行限制区的限制码 3 作为告警")
     args = ap.parse_args()
 
     doc = json.loads(Path(args.featureset).read_text(encoding="utf-8"))
-    validate(doc, bridge_profile=args.bridge_profile)
+    validate(doc, allow_restriction_3=args.allow_restriction_3)
 
     for e in errors:
         print(f"[ERROR] {e}")

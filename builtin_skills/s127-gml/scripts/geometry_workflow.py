@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -12,8 +11,7 @@ from collections import Counter
 from pathlib import Path
 
 import validate_featureset as checks
-import yangshan_profile
-import zhangzhou_profile
+import source_rules
 from build_gml import DRAFT_MARKER, build, feature_label, warnings as build_warnings, write_assoc_csv
 from gml_to_featureset import (
     GML, XLINK, XSI_NIL, convert, dataset_members, local, parse_geometries, reference,
@@ -29,11 +27,6 @@ GEOMETRY_NIL_REASONS = {"unknown", "notApplicable", "unpopulated", "missing", "w
 
 def feature_ref(feature):
     return feature.get("ref") or feature.get("id")
-
-
-def bridge_partition(feature):
-    name = yangshan_profile.chinese(feature)
-    return name == yangshan_profile.BRIDGE_SAFETY or bool(re.fullmatch(yangshan_profile.BRIDGE_SPAN, name))
 
 
 def surface_signature(geometry):
@@ -145,11 +138,12 @@ def supplement(doc, path, matches):
     reserved = set(matches.values())
     pool = doc.setdefault("geometries", {})
     used_partitions = {}
-    yangshan = yangshan_profile.applies(doc)
-    if yangshan:
-        for ref, feature in ((feature_ref(f), f) for f in geographic if bridge_partition(f)):
-            if ref not in pending and feature.get("geometry") in pool:
-                used_partitions[surface_signature(pool[feature["geometry"]])] = ref
+    for feature in geographic:
+        ref = feature_ref(feature)
+        group = source_rules.partition(feature)
+        shape = pool.get(feature.get("geometry"), {})
+        if group and ref not in pending and shape.get("type") == "surface":
+            used_partitions[group, surface_signature(shape)] = ref
 
     notes = {}
     for ref, feature in pending.items():
@@ -173,10 +167,11 @@ def supplement(doc, path, matches):
             checks.check_geometry(gid, geometry)
             if checks.errors:
                 raise ValueError("；".join(checks.errors))
-            if yangshan and bridge_partition(feature):
-                signature = surface_signature(geometry)
+            group = source_rules.partition(feature)
+            if group and geometry["type"] == "surface":
+                signature = group, surface_signature(geometry)
                 if signature in used_partitions:
-                    raise ValueError(f"边界与 {used_partitions[signature]} 重复；桥孔和安全水域分区须各提供独立几何")
+                    raise ValueError(f"边界与 {used_partitions[signature]} 重复；独立分区须各提供不同几何")
                 used_partitions[signature] = ref
         except ValueError as exc:
             notes[ref] = f"#{gid}：{exc}"
@@ -211,8 +206,10 @@ def inventory(doc, notes):
             status, action = "已具备", "否"
         if action != "否":
             pending.add(ref)
-        evidence = feat.get("geometryEvidence") or {}
-        detail = notes.get(ref) or evidence.get("reference") or ""
+        evidence = source_rules.geometry_evidence(feat)
+        detail = "；".join(filter(None, (notes.get(ref), evidence.get("reference"),
+                                       evidence.get("reviewReference"),
+                                       source_rules.basis(feat).get("reference"))))
         rows.append((ref, feature_label(feat) or ref, feat["type"], status, action, detail))
 
     blocked = []
@@ -224,58 +221,18 @@ def inventory(doc, notes):
     return rows, pending, blocked
 
 
-def audit_yangshan(doc):
-    features = doc["features"]
-    by_ref = {feature_ref(f): f for f in features}
-    counts = Counter(yangshan_profile.chinese(f) for f in features if f["type"] == "RestrictedAreaNavigational")
-    problems = []
-    expected = {yangshan_profile.BRIDGE_SAFETY: 5, **{f"东海大桥{i}号通航孔航道": 1 for i in range(1, 5)}}
-    for name, count in expected.items():
-        if counts[name] != count:
-            problems.append(f"洋山专题：{name} 应有 {count} 个独立航行限制区，现有 {counts[name]} 个")
-    seen = {}
-    regulated = {a.get("target") for f in features if f["type"] in GEOGRAPHIC_FEATURES
-                 for a in f.get("associations", []) if a.get("role") == "theRxN"}
-    vts_rules = {a.get("target") for f in features if f["type"] == "VesselTrafficServiceArea"
-                 and any(a.get("role") == "controlAuthority" for a in f.get("associations", []))
-                 for a in f.get("associations", []) if a.get("role") == "theRxN"}
-    regulations = {yangshan_profile.chinese(f): f for f in features if f["type"] == "Regulations"}
-    common = doc.get("common") or {}
-    for name in yangshan_profile.REPORT_NAMES:
-        rule = regulations.get(name)
-        required_links = vts_rules if name == yangshan_profile.REPORT_NAMES[1] else regulated
-        if not rule or feature_ref(rule) not in required_links or not any(
-            a.get("role") == "isApplicableTo" and a.get("inclusion") == "included"
-            and by_ref.get(a.get("target"), {}).get("type") == "Applicability"
-            for a in rule.get("associations", [])
-        ):
-            problems.append(f"洋山专题：{name} 缺少规则、适用对象或必要的地理关联")
-    for f in features:
-        label = yangshan_profile.chinese(f) or feature_ref(f)
-        ordinary = yangshan_profile.ordinary_name(label)
-        attrs = f.get("attributes", {})
-        if f["type"] in yangshan_profile.SOURCED_TYPES:
-            defaults = {} if f.get("reusable") else common
-            source = f.get("sourceIndication", defaults.get("sourceIndication")) or {}
-            date_range = f.get("fixedDateRange", defaults.get("fixedDateRange")) or {}
-            if not re.search(r"第\s*16\s*号公告|Announcement\s+No\.?\s*16\b", source.get("source", "")) \
-                    or source.get("reportedDate") != yangshan_profile.PUBLISHED or date_range != yangshan_profile.VALIDITY:
-                problems.append(f"洋山专题：{label} 的第16号公告来源、发布日期或有效期不符")
-        if f["type"] == "ShipReport":
-            problems.append(f"洋山专题：{label} 的报告义务应使用 Regulations")
-        if ordinary or bridge_partition(f):
-            expected_codes = ({7, 1} if label == yangshan_profile.BRIDGE_SAFETY else {30, 3, 8, 1}
-                              if bridge_partition(f) else {1, 3})
-            values = attrs.get("restriction") or []
-            values = values if isinstance(values, list) else [values]
-            codes = {ENUMS["restriction"].get(str(item), item if isinstance(item, int) else None) for item in values}
-            if f["type"] != "RestrictedAreaNavigational" or codes != expected_codes or "categoryOfRouteingMeasure" in attrs:
-                problems.append(f"洋山专题：{label} 应为航行限制区，限制码为 {sorted(expected_codes)}")
-        if bridge_partition(f) and f.get("geometry"):
-            signature = surface_signature(doc["geometries"][f["geometry"]])
-            if signature in seen:
-                problems.append(f"洋山专题：{feature_ref(f)} 与 {seen[signature]} 的分区边界重复")
-            seen[signature] = feature_ref(f)
+def check_partitions(doc):
+    seen, problems = {}, []
+    for feature in doc["features"]:
+        group = source_rules.partition(feature)
+        shape = doc.get("geometries", {}).get(feature.get("geometry"), {})
+        if not group or shape.get("type") != "surface" or feature.get("geometryStatus") == "review":
+            continue
+        key = group, surface_signature(shape)
+        ref = feature_ref(feature)
+        if key in seen:
+            problems.append(f"独立分区 {group} 中 {ref} 与 {seen[key]} 的边界重复")
+        seen[key] = ref
     return problems
 
 
@@ -300,86 +257,38 @@ def format_inventory(rows):
     ]
 
 
-def prepare_draft(doc, bridge_profile):
-    """Apply narrowly scoped production rules before validating an initial draft."""
-    yangshan = yangshan_profile.applies(doc)
-    notes = yangshan_profile.normalize(doc) if yangshan else zhangzhou_profile.normalize(doc)
-    zhangzhou_areas = set(notes) if not yangshan else set()
-    features = doc.get("features") or []
-    removed_geometries = set()
-    for feature in features:
-        if feature.get("geometry") and feature["type"] in GEOGRAPHIC_FEATURES:
-            evidence = feature.get("geometryEvidence") or {}
-            supported = evidence.get("kind") in yangshan_profile.GEOMETRY_EVIDENCE and evidence.get("reference")
-            if not supported and (yangshan or feature_ref(feature) in zhangzhou_areas or feature.get("geometryStatus") == "review"):
-                removed_geometries.add(feature.pop("geometry"))
-                feature.pop("geometryStatus", None)
-                detail = "已移除无可核对依据的几何；请上传同名准确 GML"
-                key = feature_ref(feature)
-                notes[key] = "；".join(filter(None, (notes.get(key), detail)))
-            elif evidence.get("kind") == "chart-trace":
-                feature["geometryStatus"] = "review"
-        if yangshan_profile.fishing_allowed(feature, yangshan):
-            continue
-        if not bridge_profile or feature.get("type") != "RestrictedAreaNavigational" or checks.bridge_area(feature):
-            continue
-        attrs = feature.get("attributes") or {}
-        value = attrs.get("restriction")
-        restrictions = value if isinstance(value, list) else [value]
-        fishing = [item for item in restrictions
-                   if str(item).strip().lower() in {"3", "fishing prohibited"}]
-        if not fishing:
-            continue
-        attrs["restriction"] = [item for item in restrictions if item not in fishing] or {"$nil": True}
-        text = feature.get("textContent") or []
-        if isinstance(text, dict):
-            text = [text]
-        if not text:
-            text.append({"categoryOfText": "abstract or summary"})
-        existing = text[0].get("information") or []
-        if isinstance(existing, dict):
-            existing = [existing]
-        existing.append({"text": {"eng": "Fishing operations are prohibited.", "zho": "禁止捕捞作业。"}})
-        text[0]["information"] = existing
-        feature["textContent"] = text
-        notes[feature_ref(feature)] = "普通航道的禁捕捞移入条文信息；桥区兼容代码 3 不适用"
-
-    used = {feature.get("geometry") for feature in features}
-    for key in removed_geometries - used:
-        doc.get("geometries", {}).pop(key, None)
-    return notes
-
-
 def produce(args):
     doc = json.loads(args.input.read_text(encoding="utf-8-sig"))
-    notes = prepare_draft(doc, args.bridge_profile) if args.command == "draft" else {}
-    checks.validate(doc, bridge_profile=args.bridge_profile)
+    notes = source_rules.normalize_draft(doc, allow_restriction_3=args.allow_restriction_3) if args.command == "draft" else {}
+    for key, detail in source_rules.prepare_geometries(doc).items():
+        notes[key] = "；".join(filter(None, (notes.get(key), detail)))
+    checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
     if args.command == "complete" and args.geometry_gml and not checks.errors:
         matches = dict(args.match or [])
         if len(matches) != len(args.match or []):
             raise ValueError("同一个要素不能指定多个 --match")
         try:
-            notes = supplement(doc, args.geometry_gml, matches)
+            notes.update(supplement(doc, args.geometry_gml, matches))
         except (OSError, ET.ParseError, KeyError, ValueError) as exc:
             write_report(args.report, ["# S-127 几何补录报告", "", f"上传的几何未能补录：{exc}", "",
                                        *format_inventory(inventory(doc, {})[0])])
             return 1
-        checks.validate(doc, bridge_profile=args.bridge_profile)
+        checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
 
     rows, pending, blocked = inventory(doc, notes)
-    profile_errors = audit_yangshan(doc) if yangshan_profile.applies(doc) and not checks.errors else []
+    partition_errors = check_partitions(doc) if not checks.errors else []
     draft = args.command == "draft" or bool(pending)
     label = "草稿" if draft else "几何补录完成"
     report = [f"# S-127 {label}报告", "", *format_inventory(rows)]
     if pending:
         report += ["请上传含准确几何的同名 GML。不同范围的同名面须逐一指定要素标识与供体 gml:id；报告中的编号不是空间配对依据。", ""]
-    if yangshan_profile.applies(doc):
-        report += ["洋山专题：第16号公告落款 2026-08-21；2026-10-01 施行，2031-10-01 到达五年届满界点（对照表的最后有效日为 2031-09-30）。", ""]
+    if notes.get("common"):
+        report += [notes["common"], ""]
     report += report_section("涉及待确认几何的关联", blocked)
-    report += report_section("要素目录及编码错误", checks.errors + profile_errors)
+    report += report_section("要素目录及编码错误", checks.errors + partition_errors)
     report += report_section("编码告警与人工核对项", checks.warns)
 
-    if checks.errors or profile_errors:
+    if checks.errors or partition_errors:
         write_report(args.report, report)
         return 1
 
@@ -481,9 +390,7 @@ def audit(args):
                 for geometry in member.findall("{*}geometry"):
                     member.remove(geometry)
         doc = convert(args.input, root=root, geoms_by_id=geometries)
-        checks.validate(doc, bridge_profile=args.bridge_profile)
-        if yangshan_profile.applies(doc) and not checks.errors:
-            structure_errors.extend(audit_yangshan(doc))
+        checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
         rows, _, blocked = inventory(doc, {})
     except (OSError, ET.ParseError, KeyError, AttributeError, IndexError, ValueError) as exc:
         structure_errors.append(f"无法完整解析 GML：{exc}")
@@ -536,7 +443,8 @@ def main():
         phase = phases.add_parser(command)
         phase.add_argument("input", type=Path)
         phase.add_argument("--report", type=Path, required=True)
-        phase.add_argument("--bridge-profile", action="store_true", help="标注桥区项目的代码 3 兼容项")
+        phase.add_argument("--allow-restriction-3", "--bridge-profile", action="store_true",
+                           help="显式采用项目兼容口径：航行限制区的限制码 3 作为告警")
         if command != "check":
             phase.add_argument("-o", "--output", type=Path, required=True)
             phase.add_argument("--featureset-out", type=Path, required=command == "complete")
