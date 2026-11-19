@@ -56,6 +56,11 @@
         }
       }
     },
+    "productionProfile": {
+      "type": "string",
+      "enum": ["yangshan-announcement-16-2026"],
+      "description": "仅供匹配 2026 年第 16 号公告的洋山法规使用"
+    },
     "geometries": {
       "type": "object",
       "description": "键名任取，被 features[].geometry 引用",
@@ -526,6 +531,14 @@
         "geometryStatus": {
           "const": "review",
           "description": "已有几何为概位或勾绘结果，需用户确认或提供准确 GML"
+        },
+        "geometryEvidence": {
+          "type": "object",
+          "required": ["kind", "reference"],
+          "properties": {
+            "kind": {"enum": ["enc", "source-boundary", "source-circle", "chart-trace", "user-gml"]},
+            "reference": {"type": "string", "minLength": 1}
+          }
         },
         "geometry": {
           "type": "string",

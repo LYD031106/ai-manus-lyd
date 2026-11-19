@@ -40,6 +40,82 @@ class GeometryWorkflowTest(unittest.TestCase):
     def report(self, name):
         return (self.directory / name).read_text(encoding="utf-8")
 
+    def test_yangshan_feedback_coding_and_round_trip(self):
+        self.dataset["title"] = "S-127 Yangshan test"
+        self.write_json("seed.json", [
+            feature("fairway", "RouteingMeasure", "金山航道", geometry="a", sourceIndication={
+                "source": ["Announcement No. 16 (2026-00146)", "上海洋山深水港区及其附近水域通航安全管理规定"],
+            },
+                    attributes={"categoryOfRouteingMeasure": 3}),
+            feature("main", "WaterwayArea", "洋山港主航道（黄泽洋灯船至Y0灯浮段）",
+                    attributes={"dynamicResource": "static"}),
+            feature("safety", "RestrictedAreaNavigational", "东海大桥桥区安全水域", geometry="b"),
+            feature("old-report", "ShipReport", "原报告"),
+        ], SURFACES)
+        self.run_script("geometry_workflow.py", "draft", "seed.json", "-o", "review.gml",
+                        "--featureset-out", "draft.json", "--report", "report.md", "--bridge-profile")
+        output = json.loads(self.report("draft.json"))
+        by_name = {f["featureName"]["zho"]: f for f in output["features"]}
+        self.assertEqual(by_name["金山航道"]["attributes"], {"restriction": [1, 3]})
+        self.assertEqual(by_name["洋山港主航道（黄泽洋灯船至Y0灯浮段）"]["attributes"], {"restriction": [1, 3]})
+        self.assertNotIn("geometry", by_name["金山航道"])
+        self.assertEqual(len(output["geometries"][by_name["洋山警戒区"]["geometry"]]["exterior"]), 145)
+        self.assertEqual(output["common"]["sourceIndication"]["reportedDate"], "2026-08-21")
+        self.assertEqual(output["common"]["fixedDateRange"]["dateEnd"], "2031-10-01")
+        self.assertEqual(by_name["载运散装危险货物的船舶"]["attributes"]["categoryOfCargo"], [1, 7])
+        self.assertEqual(by_name["船长大于250米的集装箱船舶"]["attributes"]["vesselsMeasurements"][0]["comparisonOperator"], "greater than")
+        draft = ET.parse(self.directory / "review.draft.gml").getroot()
+        self.assertIsNone(draft.find(".//{*}ShipReport"))
+        self.assertTrue(draft.findall(".//{*}InclusionType"))
+        areas = draft.findall(".//{*}RestrictedAreaNavigational")
+        self.assertEqual(sum(any(n.text == "东海大桥桥区安全水域" for n in a.findall("{*}featureName/{*}name"))
+                             for a in areas), 5)
+        self.assertIsNone(draft.find(".//{*}Regulations/{*}geometry"))
+        self.assertGreater(len(draft.findall(".//{*}surfaceProperty[@nilReason='unknown']")), 20)
+        self.run_script("geometry_workflow.py", "check", "review.draft.gml", "--report", "checked.md",
+                        "--bridge-profile", code=1)
+        self.assertIn("无法作为最终成果", self.report("checked.md"))
+        self.assertNotIn("缺少规则、适用对象", self.report("checked.md"))
+        self.run_script("validate_featureset.py", "draft.json", code=1)
+
+        first, second = [f for f in output["features"] if f["featureName"]["zho"] == "东海大桥桥区安全水域"][:2]
+        donor_a = {**first, "geometry": "a", "associations": []}
+        donor_b = {**second, "geometry": "b", "associations": []}
+        self.dataset.pop("title")
+        same_boundary = {"a": SURFACES["a"], "b": {"type": "surface", "exterior": list(reversed(SURFACES["a"]["exterior"]))}}
+        self.write_json("donor.json", [donor_a, donor_b], same_boundary)
+        self.run_script("build_gml.py", "donor.json", "-o", "donor.gml")
+        self.run_script("geometry_workflow.py", "complete", "draft.json", "donor.gml", "-o", "patched.gml",
+                        "--featureset-out", "patched.json", "--report", "patch.md", "--bridge-profile", "--match", f"{first['ref']}=f1",
+                        "--match", f"{second['ref']}=f2")
+        self.assertIn("分区须各提供独立几何", self.report("patch.md"))
+        self.assertFalse((self.directory / "patched.gml").exists())
+
+    def test_zhangzhou_bridge_notice_keeps_clearance_and_omits_unverified_date(self):
+        self.dataset.update(title="漳州海事局辖区桥梁信息：闽航通〔2026〕0052号", referenceDate="2026-11-10")
+        self.write_json("seed.json", [feature(
+            "old", "WaterwayArea", "九龙江口龙江大桥桥区水域", geometry="a",
+            sourceIndication={"source": "闽航通〔2026〕0052号", "reportedDate": "2026-11-10"},
+            textContent=[{"information": [{"text": {"zho": "通航净空高度23.5米；禁止锚泊。"}}]}],
+        ), feature("other", "WaterwayArea", "九龙江口南港特大桥桥区水域",
+                   textContent=[{"information": [
+                       {"headline": {"zho": "通航净空高度"}, "text": {"zho": "14.5（黄海高程系统）"}},
+                       {"headline": {"zho": "通航净空宽度"}, "text": {"zho": "140米"}},
+                   ]}])], SURFACES)
+        self.run_script("geometry_workflow.py", "draft", "seed.json", "-o", "bridge.gml",
+                        "--featureset-out", "draft.json", "--report", "bridge.md", "--bridge-profile")
+        bridge, other = json.loads(self.report("draft.json"))["features"]
+        self.assertEqual(bridge["featureName"]["zho"], "龙江大桥桥区水域")
+        self.assertEqual(bridge["type"], "RestrictedAreaNavigational")
+        self.assertEqual(bridge["attributes"]["restriction"], [35, 3, 1])
+        self.assertNotIn("reportedDate", bridge["sourceIndication"])
+        self.assertNotIn("geometry", bridge)
+        self.assertIn("通航净空高度：23.5米。", self.report("bridge.draft.gml"))
+        self.assertNotIn("禁止锚泊", self.report("bridge.draft.gml"))
+        self.assertEqual(other["featureName"]["zho"], "南港特大桥桥区水域")
+        self.assertIn("14.5（黄海高程系统）", self.report("bridge.draft.gml"))
+        self.assertNotIn("140米", self.report("bridge.draft.gml"))
+
     def test_three_phases_preserve_vts_associations(self):
         vts = feature("vts", "VesselTrafficServiceArea", "洋山交管区",
                       associations=[{"role": "reptForTrafficServ", "target": "report"}])

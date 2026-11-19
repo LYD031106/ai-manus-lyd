@@ -386,15 +386,21 @@ class AgentTaskRunner(TaskRunner):
             yield ErrorEvent(error="No message")
             return
 
-        direct = re.fullmatch(r"S-?127\s+/(draft|complete|check)", message.message.strip(), re.IGNORECASE)
+        direct = re.fullmatch(r"S-?127\s+/(draft|complete|check)((?:\s+--match\s+[^=\s]+=[^=\s]+)*)",
+                              message.message.strip(), re.IGNORECASE)
         if direct:
             action = direct.group(1).lower()
+            mapping = direct.group(2).split()[1::2]
+            if mapping and action != "complete":
+                yield ErrorEvent(error="只有 S-127 /complete 可以指定 --match 要素标识=供体gml:id。")
+                return
             expected = {"draft": [".json"], "complete": [".gml", ".json"], "check": [".gml"]}[action]
-            if sorted(PurePosixPath(path).suffix.lower() for path in message.attachments) != expected:
+            provided = sorted(PurePosixPath(path).suffix.lower() for path in message.attachments)
+            if provided != expected and not (action == "complete" and not mapping and provided == [".json"]):
                 yield ErrorEvent(error=f"S-127 /{action} 需要上传 {', '.join(expected)} 文件。")
                 return
             directory = f"/home/ubuntu/s127-{uuid4().hex}"
-            event = await self._s127_result(action, directory, message.attachments)
+            event = await self._s127_result(action, directory, message.attachments, mapping)
             if event:
                 yield event
                 yield DoneEvent()
@@ -425,18 +431,22 @@ class AgentTaskRunner(TaskRunner):
         logger.info(f"Agent {self._agent_id} completed processing one message")
 
     
-    async def _s127_result(self, action: str, directory: str, inputs: list[str]) -> MessageEvent | None:
+    async def _s127_result(self, action: str, directory: str, inputs: list[str],
+                           mapping: list[str] | None = None) -> MessageEvent | None:
         """Run the fixed workflow and publish its files without another model turn."""
         report = f"{directory}/report.md"
         result = f"{directory}/S127.gml"
         json_path = f"{directory}/featureset.json"
         assoc_path = f"{directory}/associations.csv"
+        record_path = f"{directory}/S127-record.xlsx"
         inputs = sorted(inputs, key=lambda path: PurePosixPath(path).suffix.lower() != ".json")
         script = "/opt/skills/s127-gml/scripts/geometry_workflow.py"
         args = ["timeout", "20", "python3", script, action, *inputs, "--report", report, "--bridge-profile"]
         if action != "check":
-            args += ["-o", result, "--featureset-out", json_path, "--assoc-csv", assoc_path]
-        candidates = [report, result, f"{directory}/S127.draft.gml", json_path, assoc_path]
+            args += ["-o", result, "--featureset-out", json_path, "--assoc-csv", assoc_path, "--record", record_path]
+        for match in mapping or []:
+            args.extend(("--match", match))
+        candidates = [report, result, f"{directory}/S127.draft.gml", json_path, assoc_path, record_path]
         outputs = " ".join(shlex.quote(path) for path in candidates)
         command = (
             f"mkdir -p -- {shlex.quote(directory)} && "

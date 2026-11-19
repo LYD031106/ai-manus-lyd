@@ -51,8 +51,8 @@ GML 一律由脚本生成。根据上传件和用户意图选择阶段，可在�
 用户上传 GML 用于补录时执行阶段二，上传 GML 要求审查时执行阶段三。多份草稿并存时先确认对应数据集。
 
 已有结构化成果时，用户可上传文件并发送 `S-127 /draft`（一个 featureset JSON）、
-`S-127 /complete`（一个 featureset JSON 和一个准确几何 GML）或 `S-127 /check`（一个 GML）。
-这三个入口直接运行脚本并交付附件。显式同名消歧仍使用脚本的 `--match`。
+`S-127 /complete`（一个 featureset JSON，几何待补时另传一个准确几何 GML）或 `S-127 /check`（一个 GML）。
+这三个入口直接运行脚本并交付附件。阶段二可在命令后追加 `--match 草稿ref=上传GML的gml:id`，逐个明确同名分段或经确认的异名对应。
 
 源文件首次编码时，优先完成可校验的 JSON、草稿 GML 和几何清单。合并读取和写入操作，
 在同一个编码步骤内完成校验和附件交付。已有草稿即先交付，记录表、长篇复核和其他附属文件随后处理。
@@ -78,7 +78,8 @@ GML 一律由脚本生成。根据上传件和用户意图选择阶段，可在�
 - 公告写“详见附件”但附件未提供时：先明确缺什么，不要用 OSM、示意图或网页检索无限反推。
 - 确实没有坐标时：建要素并保留属性及关联，几何留空。只有概位或勾绘结果时，设置 `"geometryStatus": "review"`。
   阶段一交付初始 GML（没有任何坐标也可生成）、完整要素清单及记录表，并请用户提供同名准确几何。
-  涉及待补录 VTS 几何的 ShipReport 关联也列入报告。
+  列出受待补录几何影响的关联，包括洋山 VTS 区域至 `Regulations` 的关联。
+  不要以附件中的示意图、航标点、通航净宽或少量可读坐标替代真实边界。法规完整规定的圆形范围用圆心和半径构建；不要用少数拐点代替圆。
 - 单步工具调用控制在 **30–50 次**；解析、OCR、坐标、构建分步落盘，迭代将尽时优先交付已完成部分，不要直接耗尽 100 次。
 
 ### ① 解析：文本走脚本，图走模型
@@ -150,12 +151,12 @@ S=/opt/skills/s127-gml/scripts
 # 阶段一：校验并构建 127CN00XXX001.draft.gml，列出全部要素及几何状态
 python3 $S/geometry_workflow.py draft featureset.json \
        -o 127CN00XXX001.gml --featureset-out featureset-draft.json \
-       --report 几何清单.md --assoc-csv 关联补录清单.csv
+       --report 几何清单.md --assoc-csv 关联补录清单.csv --record S-127草稿记录表.xlsx
 
 # 阶段二：按名称补录用户上传的准确几何
-python3 $S/geometry_workflow.py complete featureset.json 准确几何.gml \
+python3 $S/geometry_workflow.py complete featureset-draft.json 准确几何.gml \
        -o 127CN00XXX001.gml --featureset-out featureset-complete.json \
-       --report 几何补录报告.md --assoc-csv 关联补录清单.csv
+       --report 几何补录报告.md --assoc-csv 关联补录清单.csv --record S-127补录记录表.xlsx
 
 # 阶段三：检查用户上传的最终 GML
 python3 $S/geometry_workflow.py check 最终.gml --report 编码检查报告.md
@@ -174,7 +175,9 @@ python3 $S/make_record_table.py featureset.json \
 
 阶段三分列目录和结构问题、编码告警和人工核对项。提供完整产品 XSD 及其依赖时用
 `--xsd /path/to/S127.xsd` 校验；缺少完整 XSD 时在报告注明未执行。
-项目确认的桥区 `fishing prohibited` (3) 使用 `--bridge-profile` 运行三个阶段，报告仍列出与官方要素目录的差异。
+在漳州桥区与洋山第16号公告的已确认航道、桥孔中使用 `--bridge-profile`，按项目要求保留捕捞限制 (3)，报告明确标记其与 S127FC 1.0.1 的差异。该开关不能用于为其他限制区扩充码值白名单。
+洋山第16号公告专题应在 JSON 中标明 `"productionProfile": "yangshan-announcement-16-2026"`。只读到规定正文时，应同时核对发文公告：落款 2026-08-21、2026-10-01 施行、2031-10-01 为五年届满界点。
+将报告义务写入 `Regulations`，用 `InclusionType` 绑定适用对象并关联必要的地理要素；VTS 几何未核实时保留待补关联，不建立概位。东海大桥四处航道和五处安全水域分别建面，安全水域仅可依据真实边界补录。同名分段和异名编号不得按表格顺序或 FIN 推断对应关系。
 
 辅助脚本：
 

@@ -42,6 +42,7 @@ from s127_model import (  # noqa: E402
     FEATURES,
     child_order,
     composite_order,
+    geometry_allowed,
     geometry_kind,
     merges_bilingual,
     permitted_labels,
@@ -531,6 +532,14 @@ def build(doc: dict, assoc_objects: bool = False, *, draft: bool = False):
             ]
         elif is_geo:
             warn(f"{ref}（{ftype}）是地理要素但没有 geometry")
+            if draft:
+                primitive = next((kind for kind in ("surface", "curve", "point")
+                                  if geometry_allowed(ftype, kind)), "surface")
+                geom_lines = [
+                    f"{IND*3}<geometry>",
+                    f'{IND*4}<s100:{primitive}Property nilReason="unknown"/>',
+                    f"{IND*3}</geometry>",
+                ]
 
         order = child_order(ftype)
         unknown = [k for k in attrs if k not in order]

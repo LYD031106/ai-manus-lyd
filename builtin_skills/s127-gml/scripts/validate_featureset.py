@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import yangshan_profile
 import sys
 from datetime import date
 from pathlib import Path
@@ -203,8 +204,8 @@ def check_enums(where: str, node, owner: str | None = None, ftype: str | None = 
                         code, _ = resolve_enum(key, item)
                         if (bridge_profile and owner is None and ftype == "RestrictedAreaNavigational"
                                 and key == "restriction" and code == 3):
-                            warn(f"{where}/{key}", "桥区项目兼容项：fishing prohibited (3) "
-                                 "超出 S127FC 航行限制区允许的子集，需核对桥区条款和目标系统")
+                            warn(f"{where}/{key}", "项目兼容项：fishing prohibited (3) "
+                                 "超出 S127FC 航行限制区允许的子集，需核对适用条文和目标系统")
                         else:
                             resolve_enum(key, item, ftype if owner is None else None)
                     except ValueError as exc:
@@ -300,7 +301,9 @@ def check_source_indication(where: str, si) -> None:
     else:
         warn(where, "未提供文件发布日期；请核对发文材料，无法确认时可省略 reportedDate")
     src = si.get("source")
-    if isinstance(src, str) and CJK.search(src) and not re.search(r"[\r\n]", src):
+    if isinstance(src, str) and CJK.search(src) and not (
+        re.search(r"[\r\n]", src) or (re.search(r"[|｜]", src) and re.search(r"[A-Za-z]", re.split(r"[|｜]", src, 1)[0]))
+    ):
         warn(where, "sourceIndication.source 似只填了中文；指南 4.4 要求中英文同时填入（先英后中）")
     fn = si.get("featureName")
     if isinstance(fn, dict):
@@ -451,6 +454,7 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
     errors.clear()
     warns.clear()
     check_dataset(doc.get("dataset") or {})
+    yangshan = yangshan_profile.applies(doc)
 
     common = doc.get("common") or {}
     if "fixedDateRange" in common:
@@ -544,7 +548,8 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
             warn(where, "专属要素应有 sourceIndication（可放在 common 里共用，指南 4.3/5.1）")
 
         # ---- 属性内部结构与枚举 ----
-        check_enums(where, attrs, ftype=ftype, bridge_profile=bridge_profile and bridge_area(feat))
+        allow_profile_code = bridge_profile and (bridge_area(feat) or yangshan_profile.fishing_allowed(feat, yangshan))
+        check_enums(where, attrs, ftype=ftype, bridge_profile=allow_profile_code)
         for key, value in attrs.items():
             if is_bilingual_shorthand(key, value):
                 continue
@@ -593,6 +598,8 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
         # ---- 几何 ----
         if "geometryStatus" in feat and feat["geometryStatus"] != "review":
             err(where, "geometryStatus 仅用于标记待确认几何，值应为 review")
+        if ftype not in GEOGRAPHIC_FEATURES and (feat.get("geometry") or feat.get("geometryStatus")):
+            err(where, "信息要素不得分配 geometry")
         if ftype in GEOGRAPHIC_FEATURES:
             gname = feat.get("geometry")
             if not gname:
@@ -606,6 +613,14 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
                 if kind and not geometry_allowed(ftype, kind):
                     err(where, f"要素目录规定 {ftype} 只允许 {allowed_primitives(ftype)} 几何，"
                                f"现给的是 {kind}")
+                if kind == "surface" and ftype in {"RestrictedAreaNavigational", "RouteingMeasure", "AnchorageArea"}:
+                    shape = geoms[gname]
+                    ring = shape.get("exterior") or shape.get("coordinates") or []
+                    threshold = 24 if (feat.get("geometryEvidence") or {}).get("kind") == "source-circle" else 8
+                    points = {str(point[:2]) for point in ring if isinstance(point, (tuple, list)) and len(point) >= 2}
+                    if len(points) < threshold:
+                        warn(where, f"几何精度复核：外环少于 {threshold} 个不同顶点；请核对法规边界、海图或圆形参数。"
+                                    "合法的少顶点原始边界应保留，不能用插点充数。")
                 # DCEG 5.16：报告点/线的方向语义，两种几何要求相反
                 if ftype == "RadioCallingInPoint":
                     has_ori = bool(attrs.get("orientationValue"))
@@ -657,7 +672,7 @@ def validate(doc: dict, *, bridge_profile: bool = False) -> None:
             restrictions = attrs.get("restriction")
             rest_labels = restrictions if isinstance(restrictions, list) else [restrictions]
             rest_labels = [str(x) for x in rest_labels if x]
-            if not any("anchoring" in x for x in rest_labels):
+            if not {"1", "anchoring prohibited", "2", "anchoring restricted"}.intersection(rest_labels):
                 for _path, text in iter_texts(
                     {"textContent": feat.get("textContent"), "attributes": feat.get("attributes")}
                 ):
