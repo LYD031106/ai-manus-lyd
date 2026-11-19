@@ -61,6 +61,10 @@
         }
       }
     },
+    "sourceReview": {
+      "$ref": "#/definitions/sourceReview",
+      "description": "影响整个数据集的来源争议或适用性待核对项"
+    },
     "geometries": {
       "type": "object",
       "description": "键名任取，被 features[].geometry 引用",
@@ -77,6 +81,17 @@
     }
   },
   "definitions": {
+    "sourceReview": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["reference", "reason"],
+        "properties": {
+          "reference": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
     "bilingualText": {
       "description": "单值文本属性的双语写法：先英文后中文，脚本用 CR 连成一格",
       "oneOf": [
@@ -527,6 +542,23 @@
           "type": "object",
           "description": "该要素类的专有属性。枚举写 label，脚本自动补 code",
           "additionalProperties": true
+        },
+        "sourceReview": {
+          "$ref": "#/definitions/sourceReview",
+          "description": "影响此要素的来源、作用范围或适用条件尚未确认；未核对时仅出草稿"
+        },
+        "geometryAnchors": {
+          "type": "array",
+          "description": "原文或独立海图记载、应落在该几何上或面内的可靠坐标；不从几何供体反填",
+          "items": {
+            "type": "object",
+            "required": ["position", "reference"],
+            "properties": {
+              "position": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
+              "reference": {"type": "string", "minLength": 1},
+              "toleranceMetres": {"type": "number", "minimum": 0, "description": "只填原文明确的不确定度或作业允许误差"}
+            }
+          }
         },
         "sourceBasis": {
           "type": "object",

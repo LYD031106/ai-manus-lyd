@@ -396,7 +396,10 @@ class AgentTaskRunner(TaskRunner):
                 return
             expected = {"draft": [".json"], "complete": [".gml", ".json"], "check": [".gml"]}[action]
             provided = sorted(PurePosixPath(path).suffix.lower() for path in message.attachments)
-            if provided != expected and not (action == "complete" and not mapping and provided == [".json"]):
+            has_check_context = action == "check" and provided == [".gml", ".json"]
+            if provided != expected and not has_check_context and not (
+                action == "complete" and not mapping and provided == [".json"]
+            ):
                 yield ErrorEvent(error=f"S-127 /{action} 需要上传 {', '.join(expected)} 文件。")
                 return
             directory = f"/home/ubuntu/s127-{uuid4().hex}"
@@ -441,7 +444,12 @@ class AgentTaskRunner(TaskRunner):
         record_path = f"{directory}/S127-record.xlsx"
         inputs = sorted(inputs, key=lambda path: PurePosixPath(path).suffix.lower() != ".json")
         script = "/opt/skills/s127-gml/scripts/geometry_workflow.py"
-        args = ["timeout", "20", "python3", script, action, *inputs, "--report", report]
+        if action == "check" and len(inputs) == 2:
+            source, gml = inputs
+            workflow_inputs = [gml, "--source-featureset", source]
+        else:
+            workflow_inputs = inputs
+        args = ["timeout", "20", "python3", script, action, *workflow_inputs, "--report", report]
         if action != "check":
             args += ["-o", result, "--featureset-out", json_path, "--assoc-csv", assoc_path, "--record", record_path]
         for match in mapping or []:

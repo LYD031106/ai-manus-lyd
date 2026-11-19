@@ -32,6 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import source_rules
+import spatial_checks
 
 from s127_model import (  # noqa: E402
     ALL_FEATURES,
@@ -442,6 +443,10 @@ def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
     errors.clear()
     warns.clear()
     check_dataset(doc.get("dataset") or {})
+    try:
+        source_rules.source_review(doc)
+    except ValueError as exc:
+        err("dataset", str(exc))
 
     common = doc.get("common") or {}
     if "fixedDateRange" in common:
@@ -540,6 +545,12 @@ def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
         check_enums(where, attrs, ftype=ftype, allow_restriction_3=allow_restriction_3)
         info = source_rules.basis(feat)
         kind = info.get("kind")
+        try:
+            source_rules.source_review(feat)
+            if spatial_checks.anchors(feat) and ftype not in GEOGRAPHIC_FEATURES:
+                err(where, "几何锚点只适用于地理要素")
+        except ValueError as exc:
+            err(where, str(exc))
         if "sourceBasis" in feat:
             if kind not in source_rules.KINDS or not source_rules.has_text(info.get("reference")):
                 err(where, "sourceBasis 需要有效的条文用途及可核对的出处")

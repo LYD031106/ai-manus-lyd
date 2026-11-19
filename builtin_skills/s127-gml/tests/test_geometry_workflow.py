@@ -261,6 +261,63 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.run_script("review_geometry.py", "input.json", "donors.gml", "bad-plan.json", "-o", "invalid.json", code=1)
         self.assertFalse((self.directory / "invalid.json").exists())
 
+    def test_independent_source_anchor_rejects_same_name_wrong_location(self):
+        ref = feature("sector", "RestrictedAreaNavigational", "水上作业区",
+                      attributes={"restriction": [7]},
+                      geometryAnchors=[{"position":[30.025,122.025],"reference":"原公告附件坐标表第 2 行"}])
+        self.write_json("source.json", [ref])
+        for label, geometry in (("wrong", "b"), ("correct", "a")):
+            self.write_json(f"{label}.json", [{k: v for k, v in ref.items() if k != "geometryAnchors"} |
+                                             {"geometry": geometry}], SURFACES)
+            self.run_script("build_gml.py", f"{label}.json", "-o", f"{label}.gml")
+        cmd = ("complete", "source.json", "wrong.gml", "-o", "out.gml",
+               "--featureset-out", "out.json", "--report", "out.md")
+        self.run_script("geometry_workflow.py", *cmd, "--match", "sector=f1")
+        self.assertFalse((self.directory / "out.gml").exists())
+        self.assertIn("超出 0 米容差，需复核空间位置", self.report("out.md"))
+        self.run_script("geometry_workflow.py", "check", "wrong.gml", "--report", "structure.md")
+        self.assertIn("不核对原文空间位置", self.report("structure.md"))
+        self.run_script("geometry_workflow.py", "check", "wrong.gml", "--source-featureset", "source.json",
+                        "--report", "location.md", code=1)
+        self.assertIn("原公告附件坐标表第 2 行", self.report("location.md"))
+
+        self.run_script("geometry_workflow.py", *cmd[:2], "correct.gml", *cmd[3:])
+        self.assertIn("已通过原文锚点检查", self.report("out.md"))
+        self.run_script("geometry_workflow.py", "check", "out.gml", "--source-featureset", "source.json",
+                        "--report", "checked.md")
+
+    def test_unresolved_citation_cannot_be_promoted_by_complete_geometry(self):
+        sample = feature("sector", "WaterwayArea", "西滩水域", geometry="a",
+                         geometryEvidence={"kind":"source-boundary", "reference":"通告附件坐标"},
+                         sourceReview=[{"reference":"通告援引的上位文件", "reason":"没有核到续期文件"}])
+        self.write_json("source.json", [sample], SURFACES)
+        self.run_script("geometry_workflow.py", "complete", "source.json", "-o", "out.gml",
+                        "--featureset-out", "out.json", "--report", "out.md")
+        self.assertFalse((self.directory / "out.gml").exists())
+        self.assertIn("没有核到续期文件", self.report("out.md"))
+        self.assertIn("已具备", self.report("out.md"))
+
+    def test_date_line_surface_does_not_wrap_across_a_distant_anchor(self):
+        geometries = {"area": {"type": "surface", "exterior": [
+            [-1, 179], [-1, -179], [1, -179], [1, 179], [-1, 179],
+        ]}}
+        region = feature("area", "RestrictedAreaNavigational", "经线测试区", geometry="area",
+                         attributes={"restriction": [7]},
+                         geometryEvidence={"kind": "source-boundary", "reference": "边界附件"})
+        args = ("complete", "source.json", "--featureset-out", "out.json", "--report", "out.md")
+        self.write_json("source.json", [region | {"geometryAnchors": [
+            {"position": [0, 180], "reference": "经线东侧海图锚点"},
+        ]}], geometries)
+        self.run_script("geometry_workflow.py", *args, "-o", "out.gml")
+        self.assertTrue((self.directory / "out.gml").exists())
+
+        self.write_json("source.json", [region | {"geometryAnchors": [
+            {"position": [0, 0], "reference": "远侧海图锚点"},
+        ]}], geometries)
+        self.run_script("geometry_workflow.py", *args, "-o", "rejected.gml")
+        self.assertFalse((self.directory / "rejected.gml").exists())
+        self.assertIn("远侧海图锚点", self.report("out.md"))
+
 
 if __name__ == "__main__":
     unittest.main()

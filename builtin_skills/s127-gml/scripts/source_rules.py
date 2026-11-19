@@ -33,6 +33,16 @@ def partition(feature):
     return value.strip() if has_text(value) and has_text(info.get("reference")) else None
 
 
+def source_review(owner):
+    items = owner.get("sourceReview", [])
+    if not isinstance(items, list) or any(
+        not isinstance(item, dict) or not has_text(item.get("reference")) or not has_text(item.get("reason"))
+        for item in items
+    ):
+        raise ValueError("sourceReview 须逐项给出待核对事项的 reference 和 reason")
+    return [f"{item['reference']}：{item['reason']}" for item in items]
+
+
 def normalize_draft(doc, *, allow_restriction_3=False):
     notes = {}
 

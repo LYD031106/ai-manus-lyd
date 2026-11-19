@@ -51,7 +51,8 @@ GML 一律由脚本生成。根据上传件和用户意图选择阶段，可在�
 用户上传 GML 用于补录时执行阶段二，上传 GML 要求审查时执行阶段三。多份草稿并存时先确认对应数据集。
 
 已有结构化成果时，用户可上传文件并发送 `S-127 /draft`（一个 featureset JSON）、
-`S-127 /complete`（一个 featureset JSON，几何待补时另传一个准确几何 GML）或 `S-127 /check`（一个 GML）。
+`S-127 /complete`（一个 featureset JSON，几何待补时另传一个准确几何 GML）或
+`S-127 /check`（一个 GML，可同时传阶段二 JSON 核对原文位置和待复核项）。
 这三个入口直接运行脚本并交付附件。阶段二可在命令后追加 `--match 草稿ref=上传GML的gml:id`，逐个明确同名分段或经确认的异名对应。
 
 源文件首次编码时，优先完成可校验的 JSON、草稿 GML 和几何清单。合并读取和写入操作，
@@ -70,7 +71,7 @@ GML 一律由脚本生成。根据上传件和用户意图选择阶段，可在�
 2. **不得默认新增信息要素。** Authority、Applicability、ShipReport、ContactDetails、Regulations、ServiceHours 只有公告/配方明确要求时才建；不要因为“规则上更完整”就额外增加。
 3. **不得把公告分别命名的长航段、多桥、多报告类型合并。** 公告没有说“整体一处”的，不要自行合并；公告没有区分的，也不要自行拆分。
 4. **名称用公告/附件原名。** 保留原名中的海域、港口和航路段；原名没有的地名前缀不添加。
-5. **几何类型按附件。** 航路附件给了宽度就必须建 `surface`（中心线 + 宽度/2 缓冲），未给宽度才建 `curve`。
+5. **几何类型按原文和要素目录。** 原文给出完整边界，或给出中心线和能唯一推导边界的宽度、偏移及分段规定时，构建 `surface`。原文本身只定义中心线且目录允许时用 `curve`。原文定义的是水域但边界不全时登记待补录。
 6. **清单与公告逐条对齐。** 数量对不上时回到公告核对，不要套用固定数字；清单定稿后再写 JSON。
 
 ### 缺坐标/缺附件的处理
@@ -176,11 +177,19 @@ python3 $S/make_record_table.py featureset.json \
 
 阶段三分列目录和结构问题、编码告警和人工核对项。提供完整产品 XSD 及其依赖时用
 `--xsd /path/to/S127.xsd` 校验；缺少完整 XSD 时在报告注明未执行。
+用 `check 最终.gml --source-featureset 阶段二结果.json --report 检查.md` 复核独立锚点及尚未解决的原文问题。
+只有 GML 时，只能作文件内的检查，不能据此说原文位置、条款适用性或范围已验收。
 默认按 S127FC 目录；航行限制区的禁捕捞条文保留在文字中。只有项目明确要求兼容码 3 时，才在三个阶段一致传入 `--allow-restriction-3`；检查报告仍记录目录差异。
 
 ### 根据原文记录编码依据
 
-先读通告正文、发布页及附件，然后选择要素类。已有人工作品可用于事后对照或补几何；它的名称、数量、限制码和 FIN 不用作生成规则。用以下 JSON 辅助字段保存出处（脚本不会把这些工作字段写进 GML）：
+按以下顺序处理每批新文件：
+
+1. 先把文件分为**原文依据**（现行公告、附件、正式海图）、**几何供体**和**验收对照**。人工成品、反馈样表、上一次的输出放入最后一类；它们不提供本轮名称、数量、日期、码值或关联结论。供体仅用于阶段二，不能反填为独立原文证据。
+2. 只从原文记录事实：适用对象、地理形态与范围、时间或阈值、行为、条件和例外。逐条独立选择要素、字段和关联；引用外部法规时核对其适用对象、生效、失效与续期。仅提到某名称或引用某文号，并不能证明全部条款适用。
+3. 写出原文依据和未确认项，再生成 GML。冻结第一阶段清单后才对照人工成果；发现差异回查原文和规则。如果原文无法支持改动，保留差异供人工核查。不能为了让某个已知成果一致而加入名称、文号、编号、码值或数量的特判。
+
+用以下 JSON 辅助字段保存出处（脚本不会把这些工作字段写进 GML）：
 
 | 输入字段 | 用法 |
 |---|---|
@@ -188,7 +197,9 @@ python3 $S/make_record_table.py featureset.json \
 | `sourceBasis.verticalClearance` | 仅桥梁信息通告需要。逐项填写原文净空高度、基面及适用桥孔，例：`[{"zho":"通航净空高度 18 米（当地高程基面）"}]`。未提供留空。净宽、设计船型等不混写在桥区净空信息中。 |
 | `sourceBasis.partitionGroup` | 只有条文或海图明确这些面彼此独立才给同组标识。数量和范围按这次输入的通航孔、桥轴线、岸线或分界依据确定。不能靠名称、FIN、其他案例数量或附件行号推断。 |
 | `reportedDateBasis` | 在 `sourceIndication` 的同级（要素或 `common`）记录发文日期出处。缺少出处的发布日期在初稿中留空；施行日、最后有效日、届满界点分开核对，不能用数据集日期填补。 |
+| `sourceReview` | 在根对象或相关要素下记录尚未解决的问题，如 `[{"reference":"通告第二条引用的管理办法","reason":"期限届满，尚未核对续期或替代文件"}]`。引用效力或适用范围未核实，不把相关限制写成确定值；记录保留时只能交付草稿。可选字段正常缺失不用列为阻断。 |
 | `geometryEvidence.kind` 与 `reference` | 完整边界用 `enc`、`source-boundary` 或 `user-gml`，注明版次、附表或来源 ID。圆形用 `source-circle` 并给 `center:[纬度,经度]` 和 `radiusMetres`。由断面切分、共边拼接或海图勾绘的候选用 `chart-trace`，保持待人工核查。没有出处的既有几何从流程草稿移除。 |
+| `geometryAnchors` | 当原文或独立海图明确某点应位于要素范围内、线上或位置处时，填写 `position:[纬度,经度]` 和 `reference`。例如桥区内的桥址、圆形水域中心、报告线端点。仅以原文精度或项目正式口径填 `toleranceMetres`，不能为通过匹配随意放宽。超差不自动补录，有歧义仍请人工指定；没有独立原文坐标就报告这项限制。 |
 
 法规条文规定的报告义务用 `Regulations` 或 `Restrictions`，按发文机构及目录区分；用 `InclusionType(included)` 绑定 `Applicability`，并由对应地理要素的 `theRxN` 关联。保留条款适用对象、时机和例外；原文明示的是报告服务或报告程序时仍可用 `ShipReport`。VTS 区域、报告线和独立报告点分别依据主管机关的范围定义；不把折线拐点当作报告点。只有坐标、岸线和地名都能核对时才闭合服务区。
 
@@ -245,12 +256,9 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 - CSV / Excel：本地解析为 Markdown 表格
 - .doc / .wps：不支持，先用 shell 转成 .docx 再解析
 
-然后阅读解析结果 Markdown，确定：覆盖的地理范围、发文机构层级、属于哪个专题。
-专题决定要素配方 —— 见 `references/05-专题配方.md`，里面按七类专题给出了
-「该建哪些要素、关联怎么连」的成品清单，照抄即可，不要从零设计。
-
-同时确认文件**有效性**：按发布时间从新到旧采用；新文件完全取代旧文件时旧的不采用；
-必要时核对《现行有效规范性文件目录》。
+然后阅读解析结果 Markdown，确定覆盖的地理范围、发文层级和条文用途。
+`references/05-专题配方.md` 提供判别条件和可用关联，按本次原文逐条采用；没有必要证据的要素不创建。
+确认适用顺位、效力和替代关系：不能只按发布日从新到旧套用；必要时核对正式的有效目录和修订文件。
 
 #### 多文件合并原则（核心规则）
 
@@ -263,7 +271,7 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
    或 `VTS指南 X.X`。多个来源用分号隔开
 3. **几何取定位文件**：要素的 `sourceIndication` 填描述其地理位置/坐标的那份文件；
    其他文件的条文内容填进 `textContent`
-4. **新文件优先**：内容冲突时以发布时间最新的文件为准
+4. **核对冲突**：按正式的适用顺位、效力和替代关系处理，无法确定时记入 `sourceReview`
 5. **互补不重复**：不同文件对同一要素的描述应合并（如 A 文件给坐标、B 文件给规则），
    而不是建两个重复要素
 
@@ -310,7 +318,7 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 | 禁鸣时段水域 | `RestrictedAreaNavigational`（`restriction` 不填，textContent 填时段） |
 | 前后船安全距离 / 避让规则 | `WaterwayArea` + `dynamicResource=static` |
 | 富余水深数值 | `UCAA`，`underkeelAllowance` 填 `underkeelAllowanceFixed` + `operation=smallest value` |
-| 内河航道通航安全管理规定 | 见 `references/05-专题配方.md` §10（平陆运河参照配方） |
+| 内河航道通航安全管理规定 | 见 `references/05-专题配方.md` §10（内河航道选型） |
 
 ### ④ 编码属性
 从原文抽取字段前，阅读 [09-UML结构与文本抽取规则.md](references/09-UML结构与文本抽取规则.md)，
@@ -338,11 +346,9 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 | 禁止掉头 | `turning prohibited` |
 | 限速 / 最高航速 | `speed restricted` |
 
-> **「除…外」例外不改枚举值（甲方口径）**：凡「不得/禁止锚泊」一律 → `anchoring prohibited`，
-> 即使原文带「除紧急情况或航道疏浚、维护外」这类例外；例外情形（紧急锚泊须报告并驶离等）
-> 用 ShipReport / `textContent` 另行表达，**不要**因为条文有「除…外」就把 `restriction`
-> 降级成 `anchoring restricted`——S-127 的 `anchoring restricted` 只用于「指定条件下**允许**锚泊」
-> （如仅限指定锚位、须经许可）的场景。
+> 先分清普遍禁锚、带限定对象或时段的禁锚，以及经许可可锚泊。明确的普遍禁令可用
+> `anchoring prohibited`，紧急避险或维护的例外另外保留；仅对特定对象或时段成立的，
+> 保留适用条件和例外，不能扩写成区域普遍禁令。须经许可或仅指定锚位可锚泊时，按原文表达限制。
 
 > `anchoring prohibited` 只在 `RestrictedAreaNavigational` 等部分要素类的 `restriction`
 > 允许子集内；`RestrictedAreaRegulatory` **没有**这个取值（各要素类子集见 `references/08`）。
@@ -413,24 +419,22 @@ ERROR 必须清零，逐条核对 WARN。即使 XML 可解析，仍要单列缺�
 | 船舶安全监督规则 | `SSSR` | `127CN00SZ_SSSR001` |
 | 桥区水域 | `BA` | `127CN00XMBA002` |
 | 避险推荐水域 | `WRVEW` | `127CN00PTWRVEW001` |
-| 内河航道通航安全管理规定 | `PLCANAL` | `127CN00PLCANAL002` |
+| 内河航道通航安全管理规定 | `<航道简称>` | `127CN00XXCANAL001` |
 
 ## 要素清单 JSON 结构
 
-完整可跑的样例：`templates/featureset.example.json`
-（复现真实数据集 `127CN00PTWRVEW001`；`--order caris` 构建结果与之逐元素一致）。
-空白骨架：`templates/featureset.skeleton.json`（VTS 专题，含 10 个要素与全套关联）。
+从空白骨架 `templates/featureset.skeleton.json` 开始，经核对后写入这次实际要素。
+历史回归样例仅用于验证文件构建，不能作为新任务的规则或素材。
 字段约定：`schemas/featureset.schema.json`。S-127 权威 schema：`schemas/S127.xsd`。
 
 ```jsonc
 {
-  "dataset":  { "name": "127CN00PTWRVEW001", "referenceDate": "2025-12-26",
-                "updateNumber": 0, "agency": "CN", "featureIdStart": 868 },
+  "dataset":  { "name": "127CN00XXYYY001", "updateNumber": 0, "agency": "CN" },
   "common":   { "fixedDateRange": {...}, "sourceIndication": {...} },  // 自动下发给所有专属要素
-  "geometries": { "g-1": { "type": "surface", "exterior": [[25.5915, 119.6846667], ...] } },
+  "geometries": { "g-1": { "type": "surface", "exterior": [...] } },
   "features": [
     { "ref": "auth-1", "type": "Authority", "reusable": true,
-      "featureName": { "eng": "PINGTAN MSA", "zho": "平潭海事局" },
+      "featureName": { "eng": "...", "zho": "..." },
       "attributes": { "categoryOfAuthority": "maritime" } },
     { "ref": "por-1", "type": "PlaceOfRefuge",
       "featureName": { "eng": "...", "zho": "..." },
@@ -454,13 +458,13 @@ ERROR 必须清零，逐条核对 WARN。即使 XML 可解析，仍要单列缺�
 - 多文件来源：几何所依据的那份文件写进要素的 `sourceIndication`，
   其余来源写进 `textContent` 里的 `sourceIndication`
 
-### VTS 类型要素的典型关联模式（真实数据集提炼）
+### VTS 类型要素的关联模式
 
 ```
 VesselTrafficServiceArea (总区/子区)
-  ├── controlAuthority ──→ Authority（主管机构，1个）
-  ├── theContactDetails ──→ ContactDetails（中英各1份 × N 站点）
-  ├── reptForTrafficServ ──→ ShipReport（每种报告类型1条）
+  ├── controlAuthority ──→ Authority（原文指定的主管机构）
+  ├── theContactDetails ──→ ContactDetails（原文适用的站点及联系方式）
+  ├── reptForTrafficServ ──→ ShipReport（符合该类结构的独立报告类型）
   ├── consistsOf ──→ RadioCallingInPoint（报告线，自动补反向 componentOf）
   └── (可选) theRxN ──→ Regulations（有特殊规定时）
 
@@ -472,8 +476,8 @@ RadioCallingInPoint
   └── componentOf ──→ VesselTrafficServiceArea（由脚本自动补齐）
 ```
 
-> **关键原则**：多个 VTS 子分区**共享**同一套 ShipReport / ContactDetails / Authority，
-> 不要为每个分区重复创建。每种报告类型（sailing plan / final / deviation / other）只建一条。
+逐个核实各子分区适用的主管机构、联系方式和报告安排。多个分区有相同安排时复用对应对象；
+适用船舶、报告时机、报告内容、联系渠道或责任机构存在差异时分别编码。
 
 ## 参考资料（按需读，不要一次全读）
 
@@ -486,7 +490,7 @@ RadioCallingInPoint
 | `references/02-要素字典.md` | 选要素类、查必填项/几何约束/允许的关联/专有属性 |
 | `references/03-枚举代码表.md` | 填任何枚举属性；51 个属性 / 452 个取值，全部来自 XSD |
 | `references/04-关联关系.md` | 连关联、选许可/包含类型、判断能否省略 |
-| `references/05-专题配方.md` | 开工第一件事：按专题照抄要素配方 |
+| `references/05-专题配方.md` | 按本次条文的用途判断候选要素，再到目录核对属性和关联 |
 | `references/06-GML结构与几何.md` | 理解脚本输出、排查导入失败、核对几何；**XSD 状况、顺序之争、保真度实测、拓扑/平面编码差异说明** |
 | `references/07-审核检查清单.md` | 交付前自检、判断某条文是否该表达、避开已知返工点与生产数据已知缺陷 |
 | `references/08-字段抽取标注规范.md` | 各字段的抽取级别（必抽/条件抽/按需/慎用）、完整枚举代码表、特殊说明 |
