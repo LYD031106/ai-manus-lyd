@@ -36,6 +36,7 @@ RUN pip install --no-cache-dir \
     "pypdfium2>=4.30.0" \
     "python-docx>=1.1.0" \
     "python-multipart>=0.0.20" \
+    "shapely>=2.0,<3" \
     "uvicorn>=0.38.0"
 
 COPY sandbox/app ./app

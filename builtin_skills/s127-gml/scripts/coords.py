@@ -19,6 +19,7 @@ import argparse
 import csv
 import json
 import math
+from pathlib import Path
 import re
 import sys
 
@@ -213,6 +214,46 @@ def sanity(points: list[list[float]]) -> None:
             print(f"[警告] [{lat}, {lon}] 疑似经纬度写反", file=sys.stderr)
 
 
+def select_geometries(points, plan):
+    if not isinstance(plan, dict) or not plan:
+        raise ValueError("坐标计划须为以几何键命名的非空对象")
+
+    def select(rows, minimum):
+        if (not isinstance(rows, list) or len(rows) < minimum
+                or any(type(i) is not int or not 1 <= i <= len(points) for i in rows)):
+            raise ValueError(f"须给出至少 {minimum} 个有效提取序号，序号范围 1–{len(points)}")
+        result = [points[i - 1] for i in rows]
+        if len({tuple(p) for p in result}) < minimum:
+            raise ValueError(f"形状至少需要 {minimum} 个不同的坐标点")
+        return result
+
+    geometries = {}
+    for name, entry in plan.items():
+        try:
+            if not isinstance(entry, dict) or set(entry) - {"type", "rows", "interiorRows"}:
+                raise ValueError("计划项只接受 type、rows 和 surface 的 interiorRows")
+            kind = entry.get("type")
+            rows = entry.get("rows")
+            if kind == "point" and isinstance(rows, list) and len(rows) == 1:
+                shape = {"type": "point", "coordinates": select(rows, 1)[0]}
+            elif kind == "curve":
+                shape = {"type": "curve", "coordinates": select(rows, 2)}
+            elif kind == "surface":
+                interior_rows = entry.get("interiorRows", [])
+                if not isinstance(interior_rows, list):
+                    raise ValueError("interiorRows 须为分环序号数组")
+                shape = {"type": "surface", "exterior": select(rows, 3),
+                         "interiors": [select(ring, 3) for ring in interior_rows]}
+            else:
+                raise ValueError("须指定 surface、curve 或恰好一个序号的 point")
+            if kind != "surface" and "interiorRows" in entry:
+                raise ValueError("只有 surface 支持内环")
+        except ValueError as exc:
+            raise ValueError(f"{name}：{exc}") from exc
+        geometries[name] = shape
+    return geometries
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="度分秒 → 十进制 [纬度, 经度]")
     ap.add_argument("tokens", nargs="*", help="直接给出的坐标串，如 \"37°27′04″N 122°08′49″E\"")
@@ -224,6 +265,9 @@ def main() -> int:
     ap.add_argument("--close", action="store_true", help="首尾闭合（面要素外环）")
     ap.add_argument("--name", default="g-1", help="输出 geometries 键名（无分组时使用）")
     ap.add_argument("--type", default="surface", choices=["surface", "curve", "point"])
+    selection = ap.add_mutually_exclusive_group()
+    selection.add_argument("--indexed", action="store_true", help="列出单组提取结果的 1 基序号与坐标")
+    selection.add_argument("--plan", type=Path, help="按提取结果序号和原文顺序生成多项几何")
     args = ap.parse_args()
 
     groups: dict[str, list[list[float]]] = {}
@@ -241,6 +285,21 @@ def main() -> int:
     if not groups:
         print("[错误] 没有解析到任何坐标", file=sys.stderr)
         return 1
+
+    if args.indexed or args.plan:
+        if args.group_col or len(groups) != 1:
+            ap.error("坐标序号只适用于未按列分组的单一输入")
+        points = next(iter(groups.values()))
+        try:
+            if any(not (-90 <= lat <= 90 and -180 <= lon <= 180) for lat, lon in points):
+                raise ValueError("提取的坐标越界，请核对原文与坐标轴")
+            result = ({i: point for i, point in enumerate(points, 1)} if args.indexed else
+                      select_geometries(points, json.loads(args.plan.read_text(encoding="utf-8-sig"))))
+        except (OSError, ValueError) as exc:
+            print(f"[错误] {exc}", file=sys.stderr)
+            return 1
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
 
     out: dict[str, dict] = {}
     total = 0

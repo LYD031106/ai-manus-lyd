@@ -31,6 +31,7 @@ from build_gml import (  # noqa: E402
     expand_text_content,
     render_value,
 )
+from source_rules import validity_dates  # noqa: E402
 from s127_model import (  # noqa: E402
     GEOGRAPHIC_FEATURES,
     NS_ATTRS,
@@ -123,6 +124,18 @@ def date_range_of(feat: dict, common: dict) -> tuple[str, str]:
         # 历史成果可能使用 YYYYMMDD；只格式化完整日期，不补齐部分日期。
         return f"{value[:4]}-{value[4:6]}-{value[6:]}" if len(value) == 8 and value.isdigit() else value
 
+    basis = feat.get("validityBasis")
+    attrs = feat.get("attributes") or {}
+    if basis is None and "fixedDateRange" not in feat and "fixedDateRange" not in attrs:
+        basis = common.get("validityBasis")
+    if basis is not None:
+        try:
+            _, last, _ = validity_dates(basis)
+        except ValueError:
+            pass
+        else:
+            if last is not None:
+                return date("dateStart"), last.isoformat()
     return date("dateStart"), date("dateEnd")
 
 

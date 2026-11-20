@@ -49,8 +49,10 @@
       "description": "自动下发给所有非 reusable 要素的共同属性",
       "properties": {
         "fixedDateRange": {
-          "$ref": "#/definitions/fixedDateRange"
+          "anyOf": [{"$ref": "#/definitions/fixedDateRange"}, {"type": "null"}]
         },
+        "validityBasis": {"$ref": "#/definitions/validityBasis"},
+        "sourceReview": {"$ref": "#/definitions/sourceReview"},
         "sourceIndication": {
           "$ref": "#/definitions/sourceIndication"
         },
@@ -64,6 +66,20 @@
     "sourceReview": {
       "$ref": "#/definitions/sourceReview",
       "description": "影响整个数据集的来源争议或适用性待核对项"
+    },
+    "coverageAreas": {
+      "type": "array",
+      "description": "独立发布覆盖范围，只引用经核实的覆盖面",
+      "items": {
+        "type": "object",
+        "required": ["geometry", "reference"],
+        "properties": {
+          "geometry": {"type": "string", "minLength": 1},
+          "reference": {"type": "string", "minLength": 1},
+          "maximumDisplayScale": {"type": "integer", "minimum": 1},
+          "minimumDisplayScale": {"type": "integer", "minimum": 1}
+        }
+      }
     },
     "geometries": {
       "type": "object",
@@ -81,6 +97,18 @@
     }
   },
   "definitions": {
+    "validityBasis": {
+      "type": "object",
+      "required": ["reference"],
+      "properties": {
+        "reference": {"type": "string", "minLength": 1},
+        "effectiveDate": {"type": "string", "format": "date"},
+        "lastValidDate": {"type": "string", "format": "date"},
+        "expiryDate": {"type": "string", "format": "date"},
+        "durationYears": {"type": "integer", "minimum": 1},
+        "dateEndConvention": {"enum": ["last-valid-day", "expiry-boundary"]}
+      }
+    },
     "sourceReview": {
       "type": "array",
       "items": {
@@ -88,7 +116,8 @@
         "required": ["reference", "reason"],
         "properties": {
           "reference": {"type": "string", "minLength": 1},
-          "reason": {"type": "string", "minLength": 1}
+          "reason": {"type": "string", "minLength": 1},
+          "rule": {"const": "validity", "description": "有效期校验自动产生；重新构建时重新确定"}
         }
       }
     },
@@ -520,8 +549,9 @@
           "$ref": "#/definitions/featureName"
         },
         "fixedDateRange": {
-          "$ref": "#/definitions/fixedDateRange"
+          "anyOf": [{"$ref": "#/definitions/fixedDateRange"}, {"type": "null"}]
         },
+        "validityBasis": {"$ref": "#/definitions/validityBasis"},
         "sourceIndication": {
           "$ref": "#/definitions/sourceIndication"
         },
@@ -567,6 +597,7 @@
           "properties": {
             "kind": {"enum": ["regulated-fairway", "bridge-waters", "bridge-information", "routeing-measure", "reporting-obligation"]},
             "reference": {"type": "string", "minLength": 1},
+            "originalName": {"type": "string", "minLength": 1},
             "partitionGroup": {"type": "string", "minLength": 1, "description": "原文或海图明确需要独立几何时使用的分组；不是按名称猜测"},
             "verticalClearance": {
               "type": "array",

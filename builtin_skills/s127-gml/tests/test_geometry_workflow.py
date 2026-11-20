@@ -140,6 +140,11 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.run_script("geometry_workflow.py", "complete", "initial.json", "geometry.gml",
                         "-o", "data.gml", "--featureset-out", "completed.json",
                         "--report", "completed.md", "--assoc-csv", "associations.csv")
+        self.assertFalse((self.directory / "data.gml").exists())
+        self.assertIn("同名候选没有独立锚点", self.report("completed.md"))
+        self.run_script("geometry_workflow.py", "complete", "initial.json", "geometry.gml",
+                        "-o", "data.gml", "--featureset-out", "completed.json",
+                        "--report", "completed.md", "--assoc-csv", "associations.csv", "--match", "vts=f1")
         final = ET.parse(self.directory / "data.gml").getroot()
         link = final.find(".//{*}VesselTrafficServiceArea/{*}reptForTrafficServ")
         ship_report = final.find(".//{*}ShipReport")
@@ -317,6 +322,86 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.run_script("geometry_workflow.py", *args, "-o", "rejected.gml")
         self.assertFalse((self.directory / "rejected.gml").exists())
         self.assertIn("远侧海图锚点", self.report("out.md"))
+
+    def test_coordinate_plan_uses_explicit_indices_and_rejects_missing_rows(self):
+        (self.directory / "positions.csv").write_text("lat,lon\n10,40\n11,40\n10,41\n", encoding="utf-8")
+        plan = self.directory / "plan.json"
+        plan.write_text(json.dumps({"area": {"type": "surface", "rows": [3, 1, 2]},
+                                    "line": {"type": "curve", "rows": [2, 1]}}), encoding="utf-8")
+        result = subprocess.check_output([sys.executable, str(SCRIPTS / "coords.py"), "--csv", "positions.csv",
+                                          "--plan", "plan.json"], cwd=self.directory, encoding="utf-8")
+        self.assertEqual(json.loads(result)["area"]["exterior"], [[10, 41], [10, 40], [11, 40]])
+        plan.write_text(json.dumps({"bad": {"type": "curve", "rows": [1, 4]}}), encoding="utf-8")
+        self.run_script("coords.py", "--csv", "positions.csv", "--plan", "plan.json", code=1)
+
+    def test_official_coverage_respects_holes_and_can_be_required(self):
+        region = feature("area", "WaterwayArea", "虚构作业范围", geometry="a",
+                         geometryEvidence={"kind": "source-boundary", "reference": "通告附表"})
+        shape = {"type": "surface", "exterior": [[29, 121], [32, 121], [32, 123], [29, 123]]}
+        data = {"dataset": self.dataset, "features": [region], "geometries": {**SURFACES, "coverage": shape}}
+        seed = self.directory / "initial.json"
+        seed.write_text(json.dumps(data), encoding="utf-8")
+        self.run_script("build_gml.py", "initial.json", "-o", "unchecked.gml")
+        self.run_script("geometry_workflow.py", "check", "unchecked.gml", "--require-coverage", "--report", "audit.md", code=1)
+        self.assertIn("最终发布检查需要正式 DataCoverage 面", self.report("audit.md"))
+        data["coverageAreas"] = [{"geometry": "coverage", "reference": "独立图层说明"}]
+        seed.write_text(json.dumps(data), encoding="utf-8")
+        self.run_script("build_gml.py", "initial.json", "-o", "covered.gml")
+        self.run_script("geometry_workflow.py", "check", "covered.gml", "--require-coverage", "--report", "audit.md")
+        self.assertIn("确实落在 DataCoverage", self.report("audit.md"))
+        shape["interiors"] = [[[30.01, 122.01], [30.04, 122.01], [30.04, 122.04], [30.01, 122.04]]]
+        seed.write_text(json.dumps(data), encoding="utf-8")
+        self.run_script("build_gml.py", "initial.json", "-o", "with-hole.gml")
+        self.run_script("geometry_workflow.py", "check", "with-hole.gml", "--report", "audit.md", code=1)
+        self.assertIn("落入其空洞", self.report("audit.md"))
+
+    def test_sourced_name_and_calendar_end_conventions(self):
+        data = {"dataset": self.dataset, "common": {"validityBasis": {
+            "reference": "虚构公告附则", "effectiveDate": "2027-05-18", "durationYears": 2,
+            "dateEndConvention": "expiry-boundary"}},
+            "features": [feature("area", "WaterwayArea", "旧名称",
+                                 sourceBasis={"kind": "bridge-information", "reference": "虚构桥梁附表",
+                                              "originalName": "星桥水域"})]}
+        seed = self.directory / "initial.json"
+        seed.write_text(json.dumps(data), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "draft", "initial.json", "-o", "data.gml",
+                        "--featureset-out", "draft.json", "--report", "draft.md")
+        produced = json.loads(self.report("draft.json"))
+        self.assertEqual(produced["features"][0]["featureName"]["zho"], "星桥水域")
+        self.assertEqual(produced["common"]["fixedDateRange"]["dateEnd"], "2029-05-18")
+        self.assertIn("最后有效日 2029-05-17", self.report("draft.md"))
+
+        data["common"]["validityBasis"].pop("dateEndConvention")
+        seed.write_text(json.dumps(data), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "draft", "initial.json", "-o", "data.gml",
+                        "--featureset-out", "draft.json", "--report", "draft.md")
+        produced = json.loads(self.report("draft.json"))
+        self.assertNotIn("dateEnd", produced["common"]["fixedDateRange"])
+        self.assertIn("尚需确认 GML dateEnd", self.report("draft.md"))
+
+        produced["common"]["validityBasis"]["dateEndConvention"] = "last-valid-day"
+        produced["common"]["sourceReview"].append({"reference": "原文附图", "reason": "缺海图"})
+        seed.write_text(json.dumps(produced), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "draft", "initial.json", "-o", "data.gml",
+                        "--featureset-out", "draft.json", "--report", "draft.md")
+        self.assertNotIn("尚需确认 GML dateEnd", self.report("draft.md"))
+        self.assertIn("缺海图", self.report("draft.md"))
+
+    def test_replacing_candidate_keeps_geometry_also_used_as_coverage(self):
+        flow = ("geometry_workflow.py", "complete", "initial.json", "donor.gml", "-o", "out.gml",
+                "--featureset-out", "out.json", "--report", "report.md", "--match", "area=f1")
+        geoms = {"covered": {"type": "surface", "exterior": [[29, 121], [32, 121], [32, 123], [29, 123]]},
+                 **SURFACES}
+        feat = feature("area", "WaterwayArea", "试验范围", geometry="covered", geometryStatus="review",
+                       geometryEvidence={"kind": "chart-trace", "reference": "附图"})
+        initial = {"dataset": self.dataset, "geometries": geoms, "features": [feat],
+                   "coverageAreas": [{"geometry": "covered", "reference": "正式覆盖层"}]}
+        (self.directory / "initial.json").write_text(json.dumps(initial), encoding="utf-8")
+        self.write_json("donor.json", [{**feat, "geometry": "a"}], geoms)
+        self.run_script("build_gml.py", "donor.json", "-o", "donor.gml")
+        self.run_script(*flow)
+        self.assertIn("<DataCoverage", self.report("out.gml"))
+        self.assertIn("covered", json.loads(self.report("out.json"))["geometries"])
 
 
 if __name__ == "__main__":
