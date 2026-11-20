@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import re
 import sys
 
@@ -57,6 +58,45 @@ def parse_one(token: str) -> list[float]:
     if len(found) != 1:
         raise ValueError(f"无法从 {token!r} 解析出一组经纬度（解析到 {len(found)} 组）")
     return found[0]
+
+
+def circle_surface(center: list[float], radius_metres: float, vertices: int = 144) -> dict:
+    if not 24 <= vertices <= 1440 or not 0 < radius_metres <= 100_000:
+        raise ValueError("圆形范围要求 24–1440 个顶点及 0–100000 米半径")
+    major = 6378137.0
+    flattening = 1 / 298.257223563
+    minor = major * (1 - flattening)
+    lat, lon = map(math.radians, center)
+    reduced = math.atan((1 - flattening) * math.tan(lat))
+    sin_reduced, cos_reduced = math.sin(reduced), math.cos(reduced)
+    ring = []
+    for index in range(vertices):
+        bearing = index * math.tau / vertices
+        along = math.atan2(math.tan(reduced), math.cos(bearing))
+        sin_alpha = cos_reduced * math.sin(bearing)
+        cos_alpha_squared = 1 - sin_alpha ** 2
+        coefficient = cos_alpha_squared * (major ** 2 - minor ** 2) / minor ** 2
+        scale = 1 + coefficient / 16384 * (4096 + coefficient * (-768 + coefficient * (320 - 175 * coefficient)))
+        correction = coefficient / 1024 * (256 + coefficient * (-128 + coefficient * (74 - 47 * coefficient)))
+        base = radius_metres / (minor * scale)
+        distance = base
+        for _ in range(8):
+            midpoint = math.cos(2 * along + distance)
+            sine, cosine = math.sin(distance), math.cos(distance)
+            delta = correction * sine * (midpoint + correction / 4 * (cosine * (-1 + 2 * midpoint ** 2)
+                    - correction / 6 * midpoint * (-3 + 4 * sine ** 2) * (-3 + 4 * midpoint ** 2)))
+            distance = base + delta
+        sine, cosine = math.sin(distance), math.cos(distance)
+        cross = sin_reduced * sine - cos_reduced * cosine * math.cos(bearing)
+        latitude = math.atan2(sin_reduced * cosine + cos_reduced * sine * math.cos(bearing),
+                              (1 - flattening) * math.hypot(sin_alpha, cross))
+        direction = math.atan2(sine * math.sin(bearing), cos_reduced * cosine - sin_reduced * sine * math.cos(bearing))
+        factor = flattening / 16 * cos_alpha_squared * (4 + flattening * (4 - 3 * cos_alpha_squared))
+        midpoint = math.cos(2 * along + distance)
+        longitude = lon + direction - (1 - factor) * flattening * sin_alpha * (distance + factor * sine
+                    * (midpoint + factor * cosine * (-1 + 2 * midpoint ** 2)))
+        ring.append([round(math.degrees(latitude), 7), round((math.degrees(longitude) + 180) % 360 - 180, 7)])
+    return {"type": "surface", "exterior": [*ring, ring[0]]}
 
 
 def extract(text: str) -> list[list[float]]:

@@ -11,19 +11,36 @@ from collections import Counter
 from pathlib import Path
 
 import validate_featureset as checks
+import source_rules
+import spatial_checks
 from build_gml import DRAFT_MARKER, build, feature_label, warnings as build_warnings, write_assoc_csv
 from gml_to_featureset import (
     GML, XLINK, XSI_NIL, convert, dataset_members, local, parse_geometries, reference,
 )
+from make_record_table import build_comments, build_rows, write_csv, write_xlsx
 from s127_model import ENUMS, GEOGRAPHIC_FEATURES, SRS, geometry_allowed
 
 S127_DATASET = "{http://www.iho.int/S127/gml/cs0/1.0}Dataset"
 WGS84 = {SRS, "urn:ogc:def:crs:EPSG::4326", "urn:ogc:def:crs:EPSG:0:4326"}
 PRIMITIVES = {"surfaceProperty": "surface", "curveProperty": "curve", "pointProperty": "point"}
+GEOMETRY_NIL_REASONS = {"unknown", "notApplicable", "unpopulated", "missing", "withheld", "inapplicable", "template"}
 
 
 def feature_ref(feature):
     return feature.get("ref") or feature.get("id")
+
+
+def surface_signature(geometry):
+    # Compare the same boundary even if the ring starts elsewhere or is reversed.
+    def edges(ring):
+        points = [tuple(map(float, item)) for item in ring]
+        if points and points[0] == points[-1]:
+            points.pop()
+        return tuple(sorted(tuple(sorted((a, b))) for a, b in zip(points, points[1:] + points[:1])))
+
+    return edges(geometry.get("exterior") or geometry.get("coordinates") or []), tuple(sorted(
+        edges(ring) for ring in geometry.get("interiors", [])
+    ))
 
 
 def name_keys(value):
@@ -72,9 +89,18 @@ def geometry_for(member, geometries):
     if len(props) != 1 or len(props[0]) != 1:
         raise ValueError("geometry 必须包含一个几何属性")
     prop = props[0][0]
+    kind = PRIMITIVES.get(local(prop.tag))
+    if not kind or not geometry_allowed(local(member.tag), kind):
+        raise ValueError("几何属性与要素允许的几何类型不符")
+    if not prop.get(XLINK + "href"):
+        if prop.get("nilReason") in GEOMETRY_NIL_REASONS and not len(prop) and not (prop.text or "").strip():
+            return None
+        raise ValueError("空几何属性缺少有效 nilReason 或 xlink:href")
+    if "nilReason" in prop.attrib:
+        raise ValueError("几何引用和 nilReason 不可同时填写")
     gid = reference(prop)
     geometry = geometries.get(gid)
-    if geometry is None or geometry["type"] != PRIMITIVES.get(local(prop.tag)):
+    if geometry is None or geometry["type"] != kind:
         raise ValueError(f"几何引用 #{gid} 缺失、类型不匹配或暂不支持")
     if len(prop):
         raise ValueError("暂不支持复制带 maskReference 等子元素的几何")
@@ -108,15 +134,26 @@ def supplement(doc, path, matches):
     unknown = set(matches) - pending.keys()
     if unknown:
         raise ValueError(f"--match 指向了不存在或无需补录的要素：{sorted(unknown)}")
+    if len(set(matches.values())) != len(matches):
+        raise ValueError("同一个上传要素不能分配给多个目标；请提供各目标独立的真实几何")
+    reserved = set(matches.values())
+    pool = doc.setdefault("geometries", {})
+    used_partitions = {}
+    for feature in geographic:
+        ref = feature_ref(feature)
+        group = source_rules.partition(feature)
+        shape = pool.get(feature.get("geometry"), {})
+        if group and ref not in pending and shape.get("type") == "surface":
+            used_partitions[group, surface_signature(shape)] = ref
 
     notes = {}
     for ref, feature in pending.items():
         candidates = candidates_by_ref[ref]
         if ref in matches:
             gid = matches[ref]
-            if gid not in candidates:
-                raise ValueError(f"{ref} 与 #{gid} 必须具有相同名称")
-        elif len(candidates) == 1 and donor_uses[candidates[0]] == 1:
+            if gid not in donors:
+                raise ValueError(f"上传的 GML 未找到有名称的要素 #{gid}")
+        elif len(candidates) == 1 and donor_uses[candidates[0]] == 1 and candidates[0] not in reserved:
             gid = candidates[0]
         else:
             notes[ref] = "未找到同名要素" if not candidates else f"同名有歧义，请确认对应关系：{', '.join(candidates)}"
@@ -131,11 +168,19 @@ def supplement(doc, path, matches):
             checks.check_geometry(gid, geometry)
             if checks.errors:
                 raise ValueError("；".join(checks.errors))
+            conflicts = spatial_checks.conflicts(feature, geometry)
+            if conflicts:
+                raise ValueError("；".join(conflicts))
+            group = source_rules.partition(feature)
+            if group and geometry["type"] == "surface":
+                signature = group, surface_signature(geometry)
+                if signature in used_partitions:
+                    raise ValueError(f"边界与 {used_partitions[signature]} 重复；独立分区须各提供不同几何")
+                used_partitions[signature] = ref
         except ValueError as exc:
             notes[ref] = f"#{gid}：{exc}"
             continue
 
-        pool = doc.setdefault("geometries", {})
         key = f"补录-{ref}"
         while key in pool:
             key += "-新"
@@ -143,9 +188,14 @@ def supplement(doc, path, matches):
         pool[key] = geometry
         feature["geometry"] = key
         feature.pop("geometryStatus", None)
+        feature["geometryEvidence"] = {"kind": "user-gml", "reference": f"{path.name} #{gid}"}
         if old and all(item.get("geometry") != old for item in doc["features"]):
             pool.pop(old, None)
-        notes[ref] = f"已从 {path.name} #{gid} 补录"
+        notes[ref] = f"已从 {path.name} #{gid} 补录" + ("（显式指定异名对应）" if gid not in candidates else "")
+        if spatial_checks.anchors(feature):
+            notes[ref] += "；已通过原文锚点检查"
+        else:
+            notes[ref] += "；未提供独立锚点，位置需对照原文或海图"
     return notes
 
 
@@ -164,7 +214,11 @@ def inventory(doc, notes):
             status, action = "已具备", "否"
         if action != "否":
             pending.add(ref)
-        rows.append((ref, feature_label(feat) or ref, feat["type"], status, action, notes.get(ref, "")))
+        evidence = source_rules.geometry_evidence(feat)
+        detail = "；".join(filter(None, (notes.get(ref), evidence.get("reference"),
+                                       evidence.get("reviewReference"),
+                                       source_rules.basis(feat).get("reference"))))
+        rows.append((ref, feature_label(feat) or ref, feat["type"], status, action, detail))
 
     blocked = []
     for feat in doc["features"]:
@@ -173,6 +227,55 @@ def inventory(doc, notes):
             if ref in pending or target in pending:
                 blocked.append(f"{ref} → {assoc.get('role')} → {target}（涉及待补录或待确认的几何）")
     return rows, pending, blocked
+
+
+def check_partitions(doc):
+    seen, problems = {}, []
+    for feature in doc["features"]:
+        group = source_rules.partition(feature)
+        shape = doc.get("geometries", {}).get(feature.get("geometry"), {})
+        if not group or shape.get("type") != "surface" or feature.get("geometryStatus") == "review":
+            continue
+        key = group, surface_signature(shape)
+        ref = feature_ref(feature)
+        if key in seen:
+            problems.append(f"独立分区 {group} 中 {ref} 与 {seen[key]} 的边界重复")
+        seen[key] = ref
+    return problems
+
+
+def source_review_items(doc):
+    return [
+        *source_rules.source_review(doc),
+        *(f"{feature_label(f) or feature_ref(f)}：{item}" for f in doc["features"]
+          for item in source_rules.source_review(f)),
+    ]
+
+
+def audit_source_context(doc, source):
+    if not isinstance(source, dict) or not isinstance(source.get("features"), list) or not all(
+        isinstance(feature, dict) for feature in source["features"]
+    ):
+        raise ValueError("来源清单须含有 features 要素对象数组")
+    problems = source_review_items(source)
+    located = [f for f in source["features"] if spatial_checks.anchors(f)]
+    have_geometry = [f for f in doc["features"] if f.get("geometry")]
+    matches = {feature_ref(f): [g for g in have_geometry if g["type"] == f["type"]
+               and name_keys(f.get("featureName")) & name_keys(g.get("featureName"))] for f in located}
+    uses = Counter(feature_ref(g) for found in matches.values() for g in found)
+    checked = 0
+    for feature in located:
+        label = feature_label(feature) or feature_ref(feature)
+        found = matches[feature_ref(feature)]
+        if len(found) != 1 or uses[feature_ref(found[0])] != 1:
+            problems.append(f"{label}：最终 GML 没有唯一同名同类的要素，需人工核对证据对应")
+            continue
+        shape = doc["geometries"][found[0]["geometry"]]
+        problems.extend(f"{label}：{issue}" for issue in spatial_checks.conflicts(feature, shape))
+        checked += 1
+    coverage = (f"来源清单有 {len(located)} 个带原文锚点的要素，实际对照 {checked} 个；其余位置须另外核对。"
+                if located else "来源清单未提供几何锚点；未校验要素与原文的空间位置。")
+    return problems, coverage
 
 
 def report_section(title, items, empty="未发现问题。"):
@@ -196,67 +299,56 @@ def format_inventory(rows):
     ]
 
 
-def prepare_draft(doc, bridge_profile):
-    """Apply narrowly scoped production rules before validating an initial draft."""
-    notes = {}
-    features = doc.get("features") or []
-    for feature in features:
-        if not bridge_profile or feature.get("type") != "RestrictedAreaNavigational" or checks.bridge_area(feature):
-            continue
-        attrs = feature.get("attributes") or {}
-        value = attrs.get("restriction")
-        restrictions = value if isinstance(value, list) else [value]
-        fishing = [item for item in restrictions
-                   if str(item).strip().lower() in {"3", "fishing prohibited"}]
-        if not fishing:
-            continue
-        attrs["restriction"] = [item for item in restrictions if item not in fishing] or {"$nil": True}
-        text = feature.get("textContent") or []
-        if isinstance(text, dict):
-            text = [text]
-        if not text:
-            text.append({"categoryOfText": "abstract or summary"})
-        existing = text[0].get("information") or []
-        if isinstance(existing, dict):
-            existing = [existing]
-        existing.append({"text": {"eng": "Fishing operations are prohibited.", "zho": "禁止捕捞作业。"}})
-        text[0]["information"] = existing
-        feature["textContent"] = text
-        notes[feature_ref(feature)] = "普通航道的禁捕捞移入条文信息；桥区兼容代码 3 不适用"
-
-    return notes
-
-
 def produce(args):
     doc = json.loads(args.input.read_text(encoding="utf-8-sig"))
-    notes = prepare_draft(doc, args.bridge_profile) if args.command == "draft" else {}
-    checks.validate(doc, bridge_profile=args.bridge_profile)
+    notes = source_rules.normalize_draft(doc, allow_restriction_3=args.allow_restriction_3) if args.command == "draft" else {}
+    for key, detail in source_rules.prepare_geometries(doc).items():
+        notes[key] = "；".join(filter(None, (notes.get(key), detail)))
+    checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
+    if not checks.errors:
+        for feature in doc["features"]:
+            shape = doc.get("geometries", {}).get(feature.get("geometry"))
+            if shape is None:
+                continue
+            conflicts = spatial_checks.conflicts(feature, shape)
+            if conflicts:
+                key = feature_ref(feature)
+                feature["geometryStatus"] = "review"
+                notes[key] = "；".join(filter(None, (notes.get(key), *conflicts)))
     if args.command == "complete" and args.geometry_gml and not checks.errors:
         matches = dict(args.match or [])
         if len(matches) != len(args.match or []):
             raise ValueError("同一个要素不能指定多个 --match")
         try:
-            notes = supplement(doc, args.geometry_gml, matches)
+            for key, detail in supplement(doc, args.geometry_gml, matches).items():
+                notes[key] = "；".join(filter(None, (notes.get(key), detail)))
         except (OSError, ET.ParseError, KeyError, ValueError) as exc:
             write_report(args.report, ["# S-127 几何补录报告", "", f"上传的几何未能补录：{exc}", "",
                                        *format_inventory(inventory(doc, {})[0])])
             return 1
-        checks.validate(doc, bridge_profile=args.bridge_profile)
+        checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
 
     rows, pending, blocked = inventory(doc, notes)
-    draft = args.command == "draft" or bool(pending)
+    source_review = source_review_items(doc) if not checks.errors else []
+    partition_errors = check_partitions(doc) if not checks.errors else []
+    draft = args.command == "draft" or bool(pending or source_review)
     label = "草稿" if draft else "几何补录完成"
     report = [f"# S-127 {label}报告", "", *format_inventory(rows)]
+    if pending:
+        report += ["请上传含准确几何的同名 GML。不同范围的同名面须逐一指定要素标识与供体 gml:id；报告中的编号不是空间配对依据。", ""]
+    if notes.get("common"):
+        report += [notes["common"], ""]
     report += report_section("涉及待确认几何的关联", blocked)
-    report += report_section("要素目录及编码错误", checks.errors)
+    report += report_section("待核对的原文依据", source_review)
+    report += report_section("要素目录及编码错误", checks.errors + partition_errors)
     report += report_section("编码告警与人工核对项", checks.warns)
 
-    if checks.errors:
+    if checks.errors or partition_errors:
         write_report(args.report, report)
         return 1
 
     try:
-        gml, associations = build(doc, draft=draft)
+        gml, associations = build(doc, draft=draft, assoc_objects=True)
     except (KeyError, TypeError, ValueError) as exc:
         write_report(args.report, report + report_section("GML 构建错误", [str(exc)]))
         return 1
@@ -265,10 +357,14 @@ def produce(args):
         args.featureset_out.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if args.assoc_csv:
         write_assoc_csv(args.assoc_csv, associations)
+    if args.record:
+        record_rows = build_rows(doc)
+        if not write_xlsx(args.record, record_rows, doc.get("dataset") or {}, build_comments(doc)):
+            write_csv(args.record, record_rows)
     path.write_text(gml, encoding="utf-8")
     report += report_section("GML 构建告警", build_warnings)
     write_report(args.report, report)
-    print(f"{label}：{path}；待补录或确认几何 {len(pending)} 项；报告：{args.report}")
+    print(f"{label}：{path}；待补录或确认几何 {len(pending)} 项，待核对原文依据 {len(source_review)} 项；报告：{args.report}")
     return 0
 
 
@@ -290,7 +386,11 @@ def check_xsd(path, schema):
 
 def audit(args):
     structure_errors, structure_warnings = [], []
+    checks.errors.clear()
+    checks.warns.clear()
     rows, blocked = [], []
+    context_problems = []
+    context_coverage = "未提供来源清单；本次只检查 GML 结构、码值和内部几何，不核对原文空间位置。"
     try:
         root, ids, draft = read_dataset(args.input)
         if draft:
@@ -311,10 +411,26 @@ def audit(args):
                     structure_errors.append(f"{tag}={label} 的 code 应为 {expected}，实为 {elem.get('code')!r}")
 
         geometries = read_geometries(root)
-        for member in dataset_members(root):
+        members = dataset_members(root)
+        for member in list(members):
             ref = member.get(GML + "id")
             if not ref:
                 structure_errors.append(f"{local(member.tag)} 缺少 gml:id")
+            if local(member.tag) == "DataCoverage":
+                try:
+                    coverage = geometry_for(member, geometries)
+                    if coverage is None:
+                        raise ValueError("缺少覆盖面几何")
+                    checks.check_geometry(ref or "DataCoverage", coverage)
+                    structure_errors.extend(checks.errors)
+                    structure_warnings.extend(checks.warns)
+                    checks.errors.clear()
+                    checks.warns.clear()
+                except ValueError as exc:
+                    structure_errors.append(f"DataCoverage：{exc}")
+                # DataCoverage is a meta feature, not one of the business objects converted to JSON.
+                members.remove(member)
+                continue
             if local(member.tag) in GEOGRAPHIC_FEATURES:
                 name = member.findtext("{*}featureName/{*}name")
                 label = " / ".join(item for item in (ref, name) if item) or local(member.tag)
@@ -326,23 +442,35 @@ def audit(args):
                     # 几何错误已记录。继续检查名称、属性及依赖这个要素的关联。
                     for geometry in member.findall("{*}geometry"):
                         member.remove(geometry)
+            elif member.findall("{*}geometry"):
+                structure_errors.append(f"{ref or local(member.tag)} 是信息要素，不应有 geometry")
+                for geometry in member.findall("{*}geometry"):
+                    member.remove(geometry)
         doc = convert(args.input, root=root, geoms_by_id=geometries)
-        checks.validate(doc, bridge_profile=args.bridge_profile)
+        checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
         rows, _, blocked = inventory(doc, {})
+        if args.source_featureset is not None and not checks.errors:
+            try:
+                source = json.loads(args.source_featureset.read_text(encoding="utf-8-sig"))
+                context_problems, context_coverage = audit_source_context(doc, source)
+            except (OSError, KeyError, TypeError, ValueError) as exc:
+                context_problems = [f"来源清单无法完成独立复核：{exc}"]
     except (OSError, ET.ParseError, KeyError, AttributeError, IndexError, ValueError) as exc:
         structure_errors.append(f"无法完整解析 GML：{exc}")
 
     xsd_result, xsd_failed = check_xsd(args.input, args.xsd)
-    failed = bool(structure_errors or checks.errors or xsd_failed)
+    failed = bool(structure_errors or checks.errors or xsd_failed or context_problems)
     verdict = "发现阻断问题。" if failed else "已执行的自动检查未发现阻断问题。"
     report = ["# S-127 最终 GML 检查报告", "", verdict, ""]
     report += report_section("数据标准与 GML 结构", structure_errors + checks.errors)
     report += report_section("XSD 校验", [xsd_result])
+    report += report_section("原文依据与空间位置", [context_coverage, *context_problems])
     if rows:
         report += format_inventory(rows)
     report += report_section("受几何影响的关联", blocked)
     report += report_section("编码告警与人工核对项", structure_warnings + checks.warns)
-    report += ["仍需结合原文、海图及审核口径核对要素选型、名称、发布日期和几何范围。"]
+    report += ["仍需结合原文、海图及审核口径核对要素选型、名称、发布日期和几何范围。",
+               "App_E 100 的 DataCoverage 几何涵盖关系须在生产系统核查；本工具不以 boundedBy 的外包矩形代替 DataCoverage。"]
     write_report(args.report, report)
     print(f"{verdict} 检查报告：{args.report}")
     return int(failed)
@@ -363,10 +491,10 @@ def check_paths(args):
     donor = getattr(args, "geometry_gml", None)
     if getattr(args, "match", None) and donor is None:
         raise ValueError("--match 需要提供几何 GML")
-    inputs = [args.input, donor, getattr(args, "xsd", None)]
+    inputs = [args.input, donor, getattr(args, "xsd", None), getattr(args, "source_featureset", None)]
     output = getattr(args, "output", None)
     outputs = [args.report, output, draft_path(output) if output else None,
-               getattr(args, "featureset_out", None), getattr(args, "assoc_csv", None)]
+               getattr(args, "featureset_out", None), getattr(args, "assoc_csv", None), getattr(args, "record", None)]
     paths = [path.resolve() for path in outputs if path]
     if len(paths) != len(set(paths)) or set(paths) & {path.resolve() for path in inputs if path}:
         raise ValueError("输入与各输出必须使用不同文件名")
@@ -379,16 +507,19 @@ def main():
         phase = phases.add_parser(command)
         phase.add_argument("input", type=Path)
         phase.add_argument("--report", type=Path, required=True)
-        phase.add_argument("--bridge-profile", action="store_true", help="标注桥区项目的代码 3 兼容项")
+        phase.add_argument("--allow-restriction-3", "--bridge-profile", action="store_true",
+                           help="显式采用项目兼容口径：航行限制区的限制码 3 作为告警")
         if command != "check":
             phase.add_argument("-o", "--output", type=Path, required=True)
             phase.add_argument("--featureset-out", type=Path, required=command == "complete")
             phase.add_argument("--assoc-csv", type=Path)
+            phase.add_argument("--record", type=Path, help="同时生成与实际输出一致的 XLSX 记录表")
         if command == "complete":
             phase.add_argument("geometry_gml", type=Path, nargs="?", help="同名几何 GML；已有确认几何时可省略")
             phase.add_argument("--match", action="append", type=parse_match)
         if command == "check":
             phase.add_argument("--xsd", type=Path, help="完整的本地产品 XSD，可选")
+            phase.add_argument("--source-featureset", type=Path, help="阶段二 JSON，可选；复核最终几何与原文锚点")
     args = parser.parse_args()
     try:
         check_paths(args)

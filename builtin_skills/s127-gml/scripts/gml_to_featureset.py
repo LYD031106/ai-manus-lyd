@@ -199,7 +199,9 @@ def parse_feature(elem, geom_ids, ref_of, assoc_objects):
                 names.append(item)
         elif name == "geometry":
             prop = list(child)[0]
-            feat["geometry"] = geom_ids[prop.get(XLINK + "href")[1:]]
+            href = prop.get(XLINK + "href")
+            if href:
+                feat["geometry"] = geom_ids[href[1:]]
             if len(prop):
                 feat["$geometryNote"] = (
                     "原件在 geometry 上带了 s100:maskReference（部分边界抑制显示），"
@@ -298,7 +300,8 @@ def convert(path: Path, *, root=None, geoms_by_id=None) -> dict:
         g = None
         for child in e:
             if local(child.tag) == "geometry":
-                g = list(child)[0].get(XLINK + "href")[1:]
+                href = list(child)[0].get(XLINK + "href")
+                g = href[1:] if href else None
         if g and g not in geom_ids:
             n += 1
             key = f"g-{n}"
