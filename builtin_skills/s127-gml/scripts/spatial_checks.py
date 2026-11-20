@@ -92,3 +92,68 @@ def conflicts(feature, shape):
             issues.append(f"与原文锚点「{item['reference']}」相距约 {distance:.1f} 米，"
                           f"超出 {tolerance:g} 米容差，需复核空间位置")
     return issues
+
+
+def _exterior(shape):
+    return shape.get("exterior") or shape.get("coordinates")
+
+
+def coverage_entries(doc):
+    entries = doc.get("coverageAreas", [])
+    if not isinstance(entries, list):
+        raise ValueError("coverageAreas 应为数组")
+    for entry in entries:
+        if not isinstance(entry, dict) or not isinstance(entry.get("reference"), str) or not entry["reference"].strip():
+            raise ValueError("每个 DataCoverage 须记录独立的覆盖范围出处")
+        key = entry.get("geometry")
+        shape = doc.get("geometries", {}).get(key) if isinstance(key, str) else None
+        if not shape or geometry_kind(shape) != "surface":
+            raise ValueError("DataCoverage 须引用 geometries 中已给出的面")
+        for scale in ("maximumDisplayScale", "minimumDisplayScale"):
+            if scale in entry and (type(entry[scale]) is not int or entry[scale] < 1):
+                raise ValueError(f"DataCoverage/{scale} 须为有出处的正整数")
+    return entries
+
+
+def coverage_issues(areas, members):
+    """Check full shape containment in the union of official coverage polygons."""
+    try:
+        from shapely import LineString, Point, Polygon, union_all
+        from shapely.errors import GEOSException
+    except ImportError as exc:
+        raise ValueError("缺少 Shapely，未能检查 DataCoverage 几何覆盖") from exc
+
+    meridian = float(_exterior(areas[0])[0][1])
+
+    def project(points):
+        projected = [((float(lon) - meridian + 180) % 360 - 180, float(lat))
+                     for lat, lon in points]
+        longitude = [p[0] for p in projected]
+        if max(longitude) - min(longitude) >= 180:
+            raise ValueError("几何跨越核验投影的分界或覆盖跨度过大，须在生产系统核对")
+        return projected
+
+    def topology(shape):
+        kind = geometry_kind(shape)
+        if kind == "point":
+            return Point(*project([shape.get("coordinates") or shape["position"]])[0])
+        if kind == "curve":
+            return LineString(project(_exterior(shape)))
+        polygon = Polygon(project(_exterior(shape)), [project(r) for r in shape.get("interiors", [])])
+        if polygon.is_empty or not polygon.is_valid or polygon.area == 0:
+            raise ValueError("含无效的面、内环或自交边界")
+        return polygon
+
+    try:
+        coverage = union_all([topology(shape) for shape in areas])
+    except GEOSException as exc:
+        raise ValueError("无法合并 DataCoverage 面") from exc
+
+    issues = []
+    for label, shape in members:
+        try:
+            if not coverage.covers(topology(shape)):
+                issues.append(f"{label} 有部分几何超出 DataCoverage 或落入其空洞")
+        except (ValueError, GEOSException) as exc:
+            issues.append(f"{label}：{exc}")
+    return issues

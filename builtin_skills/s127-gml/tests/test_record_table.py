@@ -14,6 +14,7 @@ from build_gml import build  # noqa: E402
 from make_record_table import (  # noqa: E402
     COLUMNS, SHEETS, build_comments, build_rows, write_csv, write_xlsx,
 )
+from source_rules import normalize_draft  # noqa: E402
 
 
 def feature(ref, kind, **kwargs):
@@ -92,6 +93,16 @@ class RecordTableTest(unittest.TestCase):
                 self.assertEqual(row[column], date.text if date is not None else "")
             source = node.findtext("{*}sourceIndication/{*}source", "")
             self.assertEqual(row[7], " / ".join(source.splitlines()))
+
+    def test_inclusive_table_end_and_exclusive_gml_end_use_same_source_period(self):
+        doc = dataset([feature("inherited", "Regulations")])
+        doc["common"]["validityBasis"] = {"reference": "示意附则", "effectiveDate": "2028-03-01",
+                                           "durationYears": 1, "dateEndConvention": "expiry-boundary"}
+        normalize_draft(doc)
+        self.assertEqual(build_rows(doc)[0][5:7], ["2028-03-01", "2029-02-28"])
+        gml, _ = build(doc, draft=True)
+        node = ET.fromstring(gml).find(".//{*}fixedDateRange/{*}dateEnd/{*}date")
+        self.assertEqual(node.text, "2029-03-01")
 
     def test_coding_values_match_gml_enums_and_keep_composite_instances(self):
         doc = dataset([

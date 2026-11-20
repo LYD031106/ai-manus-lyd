@@ -138,6 +138,7 @@ def supplement(doc, path, matches):
         raise ValueError("同一个上传要素不能分配给多个目标；请提供各目标独立的真实几何")
     reserved = set(matches.values())
     pool = doc.setdefault("geometries", {})
+    coverage_keys = {entry["geometry"] for entry in spatial_checks.coverage_entries(doc)}
     used_partitions = {}
     for feature in geographic:
         ref = feature_ref(feature)
@@ -187,15 +188,21 @@ def supplement(doc, path, matches):
         old = feature.get("geometry")
         pool[key] = geometry
         feature["geometry"] = key
-        feature.pop("geometryStatus", None)
+        anchors = spatial_checks.anchors(feature)
+        if anchors or ref in matches:
+            feature.pop("geometryStatus", None)
+        else:
+            feature["geometryStatus"] = "review"
         feature["geometryEvidence"] = {"kind": "user-gml", "reference": f"{path.name} #{gid}"}
-        if old and all(item.get("geometry") != old for item in doc["features"]):
+        if old and old not in coverage_keys and all(item.get("geometry") != old for item in doc["features"]):
             pool.pop(old, None)
         notes[ref] = f"已从 {path.name} #{gid} 补录" + ("（显式指定异名对应）" if gid not in candidates else "")
-        if spatial_checks.anchors(feature):
+        if anchors:
             notes[ref] += "；已通过原文锚点检查"
+        elif ref in matches:
+            notes[ref] += "；无独立锚点，按用户明确指定的边界补录"
         else:
-            notes[ref] += "；未提供独立锚点，位置需对照原文或海图"
+            notes[ref] += "；同名候选没有独立锚点，核对原文或海图后用 --match 明确确认"
     return notes
 
 
@@ -247,9 +254,20 @@ def check_partitions(doc):
 def source_review_items(doc):
     return [
         *source_rules.source_review(doc),
+        *source_rules.source_review(doc.get("common") or {}),
         *(f"{feature_label(f) or feature_ref(f)}：{item}" for f in doc["features"]
           for item in source_rules.source_review(f)),
     ]
+
+
+def check_coverage(doc, areas):
+    geoms = doc.get("geometries", {})
+    members = [(feature_label(f) or feature_ref(f), geoms[f["geometry"]])
+               for f in doc["features"] if f.get("geometry") and f["type"] in GEOGRAPHIC_FEATURES]
+    try:
+        return spatial_checks.coverage_issues(areas, members)
+    except ValueError as exc:
+        return [f"DataCoverage 未通过覆盖检查：{exc}"]
 
 
 def audit_source_context(doc, source):
@@ -260,15 +278,20 @@ def audit_source_context(doc, source):
     problems = source_review_items(source)
     located = [f for f in source["features"] if spatial_checks.anchors(f)]
     have_geometry = [f for f in doc["features"] if f.get("geometry")]
-    matches = {feature_ref(f): [g for g in have_geometry if g["type"] == f["type"]
-               and name_keys(f.get("featureName")) & name_keys(g.get("featureName"))] for f in located}
+    matches = {}
+    for f in located:
+        names = name_keys(f.get("featureName"))
+        found = [g for g in have_geometry if g["type"] == f["type"] and names & name_keys(g.get("featureName"))]
+        if len(found) > 1:
+            found = [g for g in found if not spatial_checks.conflicts(f, doc["geometries"][g["geometry"]])]
+        matches[feature_ref(f)] = found
     uses = Counter(feature_ref(g) for found in matches.values() for g in found)
     checked = 0
     for feature in located:
         label = feature_label(feature) or feature_ref(feature)
         found = matches[feature_ref(feature)]
         if len(found) != 1 or uses[feature_ref(found[0])] != 1:
-            problems.append(f"{label}：最终 GML 没有唯一同名同类的要素，需人工核对证据对应")
+            problems.append(f"{label}：最终 GML 找不到唯一符合原文位置的同名同类要素，需复核对应关系")
             continue
         shape = doc["geometries"][found[0]["geometry"]]
         problems.extend(f"{label}：{issue}" for issue in spatial_checks.conflicts(feature, shape))
@@ -331,7 +354,9 @@ def produce(args):
     rows, pending, blocked = inventory(doc, notes)
     source_review = source_review_items(doc) if not checks.errors else []
     partition_errors = check_partitions(doc) if not checks.errors else []
-    draft = args.command == "draft" or bool(pending or source_review)
+    coverages = spatial_checks.coverage_entries(doc) if not checks.errors else []
+    coverage_problems = check_coverage(doc, [doc["geometries"][c["geometry"]] for c in coverages]) if coverages else []
+    draft = args.command == "draft" or bool(pending or source_review or coverage_problems)
     label = "草稿" if draft else "几何补录完成"
     report = [f"# S-127 {label}报告", "", *format_inventory(rows)]
     if pending:
@@ -340,6 +365,8 @@ def produce(args):
         report += [notes["common"], ""]
     report += report_section("涉及待确认几何的关联", blocked)
     report += report_section("待核对的原文依据", source_review)
+    report += report_section("DataCoverage 空间覆盖", coverage_problems,
+                             "现有几何已由所提供覆盖面覆盖。" if coverages else "未提供正式覆盖面，待核验。")
     report += report_section("要素目录及编码错误", checks.errors + partition_errors)
     report += report_section("编码告警与人工核对项", checks.warns)
 
@@ -390,6 +417,9 @@ def audit(args):
     checks.warns.clear()
     rows, blocked = [], []
     context_problems = []
+    coverage_shapes = []
+    coverage_errors = []
+    coverage_summary = "未提供 DataCoverage，App_E 100 的空间覆盖未核验。"
     context_coverage = "未提供来源清单；本次只检查 GML 结构、码值和内部几何，不核对原文空间位置。"
     try:
         root, ids, draft = read_dataset(args.input)
@@ -419,15 +449,17 @@ def audit(args):
             if local(member.tag) == "DataCoverage":
                 try:
                     coverage = geometry_for(member, geometries)
-                    if coverage is None:
+                    if coverage is None or coverage["type"] != "surface":
                         raise ValueError("缺少覆盖面几何")
                     checks.check_geometry(ref or "DataCoverage", coverage)
-                    structure_errors.extend(checks.errors)
+                    coverage_errors.extend(checks.errors)
+                    if not checks.errors:
+                        coverage_shapes.append(coverage)
                     structure_warnings.extend(checks.warns)
                     checks.errors.clear()
                     checks.warns.clear()
                 except ValueError as exc:
-                    structure_errors.append(f"DataCoverage：{exc}")
+                    coverage_errors.append(f"DataCoverage：{exc}")
                 # DataCoverage is a meta feature, not one of the business objects converted to JSON.
                 members.remove(member)
                 continue
@@ -449,6 +481,10 @@ def audit(args):
         doc = convert(args.input, root=root, geoms_by_id=geometries)
         checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
         rows, _, blocked = inventory(doc, {})
+        if coverage_shapes:
+            coverage_errors.extend(check_coverage(doc, coverage_shapes))
+            coverage_summary = ("发现 DataCoverage 几何问题。" if coverage_errors else
+                                "已核对全部现有地理要素确实落在 DataCoverage 范围内。")
         if args.source_featureset is not None and not checks.errors:
             try:
                 source = json.loads(args.source_featureset.read_text(encoding="utf-8-sig"))
@@ -459,18 +495,20 @@ def audit(args):
         structure_errors.append(f"无法完整解析 GML：{exc}")
 
     xsd_result, xsd_failed = check_xsd(args.input, args.xsd)
-    failed = bool(structure_errors or checks.errors or xsd_failed or context_problems)
+    if args.require_coverage and not coverage_shapes:
+        coverage_errors.append("最终发布检查需要正式 DataCoverage 面。")
+    failed = bool(structure_errors or checks.errors or xsd_failed or context_problems or coverage_errors)
     verdict = "发现阻断问题。" if failed else "已执行的自动检查未发现阻断问题。"
     report = ["# S-127 最终 GML 检查报告", "", verdict, ""]
     report += report_section("数据标准与 GML 结构", structure_errors + checks.errors)
     report += report_section("XSD 校验", [xsd_result])
+    report += report_section("DataCoverage 空间覆盖", [coverage_summary, *coverage_errors])
     report += report_section("原文依据与空间位置", [context_coverage, *context_problems])
     if rows:
         report += format_inventory(rows)
     report += report_section("受几何影响的关联", blocked)
     report += report_section("编码告警与人工核对项", structure_warnings + checks.warns)
-    report += ["仍需结合原文、海图及审核口径核对要素选型、名称、发布日期和几何范围。",
-               "App_E 100 的 DataCoverage 几何涵盖关系须在生产系统核查；本工具不以 boundedBy 的外包矩形代替 DataCoverage。"]
+    report += ["仍需结合原文、海图及审核口径核对要素选型、名称、发布日期和几何范围。"]
     write_report(args.report, report)
     print(f"{verdict} 检查报告：{args.report}")
     return int(failed)
@@ -520,6 +558,7 @@ def main():
         if command == "check":
             phase.add_argument("--xsd", type=Path, help="完整的本地产品 XSD，可选")
             phase.add_argument("--source-featureset", type=Path, help="阶段二 JSON，可选；复核最终几何与原文锚点")
+            phase.add_argument("--require-coverage", action="store_true", help="最终发布检查，缺正式覆盖面也判定为阻断")
     args = parser.parse_args()
     try:
         check_paths(args)

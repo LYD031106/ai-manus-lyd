@@ -54,9 +54,9 @@ GML 一律由脚本生成。根据上传件和用户意图选择阶段，可在�
 `S-127 /complete`（一个 featureset JSON，几何待补时另传一个准确几何 GML）或
 `S-127 /check`（一个 GML，可同时传阶段二 JSON 核对原文位置和待复核项）。
 这三个入口直接运行脚本并交付附件。阶段二可在命令后追加 `--match 草稿ref=上传GML的gml:id`，逐个明确同名分段或经确认的异名对应。
+正式发布验收用 `S-127 /check --require-coverage`。只有交付方确认要使用项目兼容码时，三个阶段才追加 `--allow-restriction-3`。
 
-源文件首次编码时，优先完成可校验的 JSON、草稿 GML 和几何清单。合并读取和写入操作，
-在同一个编码步骤内完成校验和附件交付。已有草稿即先交付，记录表、长篇复核和其他附属文件随后处理。
+源文件首次编码时，先把已查证的名称、条款、属性和关联写成可校验的 JSON 并构建草稿。几何可在保存检查点后逐项补齐，单项坐标处理失败时保留该要素，空几何并说明原因。已有草稿即先交付，记录表和长篇复核随后处理。
 
 ## 要素清单先定稿（按公告逐条列举）
 
@@ -170,6 +170,7 @@ python3 $S/make_record_table.py featureset.json \
 阶段一先向用户交付草稿、校验后的 featureset JSON 和几何清单，说明草稿供审核。记录表随后生成。
 阶段二沿用对应 JSON，从同名的 S-127 GML 补入准确几何，并保留已编码的属性和关联。
 同名多段须在清单中分配独立 ref；确认对应关系后用 `--match 草稿ref=上传GML的gml:id`，可重复传入。
+只有同名、没有独立位置依据时先保留供体候选并标记待确认。人工核对后用 `--match` 明确指定；即使明确指定，有独立锚点且位置冲突的候选仍不能放行。
 仍有缺失、歧义、待确认或几何类型不符时继续交付草稿和报告。用户实际确认过的候选可填写
 `geometryEvidence.reviewReference`（能查到的复核记录），再移除 `geometryStatus` 标记；
 智能体不得替用户编造确认记录。全部几何齐全且已确认时可直接运行阶段二，省略几何 GML 参数。
@@ -178,6 +179,7 @@ python3 $S/make_record_table.py featureset.json \
 阶段三分列目录和结构问题、编码告警和人工核对项。提供完整产品 XSD 及其依赖时用
 `--xsd /path/to/S127.xsd` 校验；缺少完整 XSD 时在报告注明未执行。
 用 `check 最终.gml --source-featureset 阶段二结果.json --report 检查.md` 复核独立锚点及尚未解决的原文问题。
+提供 `DataCoverage` 时校验其覆盖面的并集是否覆盖完整地理要素几何，包括孔洞和越界部分。生产发布检查追加 `--require-coverage`，缺正式覆盖面也判定为阻断。
 只有 GML 时，只能作文件内的检查，不能据此说原文位置、条款适用性或范围已验收。
 默认按 S127FC 目录；航行限制区的禁捕捞条文保留在文字中。只有项目明确要求兼容码 3 时，才在三个阶段一致传入 `--allow-restriction-3`；检查报告仍记录目录差异。
 
@@ -197,9 +199,12 @@ python3 $S/make_record_table.py featureset.json \
 | `sourceBasis.verticalClearance` | 仅桥梁信息通告需要。逐项填写原文净空高度、基面及适用桥孔，例：`[{"zho":"通航净空高度 18 米（当地高程基面）"}]`。未提供留空。净宽、设计船型等不混写在桥区净空信息中。 |
 | `sourceBasis.partitionGroup` | 只有条文或海图明确这些面彼此独立才给同组标识。数量和范围按这次输入的通航孔、桥轴线、岸线或分界依据确定。不能靠名称、FIN、其他案例数量或附件行号推断。 |
 | `reportedDateBasis` | 在 `sourceIndication` 的同级（要素或 `common`）记录发文日期出处。缺少出处的发布日期在初稿中留空；施行日、最后有效日、届满界点分开核对，不能用数据集日期填补。 |
+| `validityBasis` | 在要素或 `common` 记录 `reference`、`effectiveDate` 以及有原文依据的 `lastValidDate`、`expiryDate` 或 `durationYears`。确认交付方的 GML `dateEndConvention` 后填 `last-valid-day` 或 `expiry-boundary`。记录表“有效期止”填最后有效日；报告同时列出届满界点。闰日周年或来源之间有歧义时待核对。 |
+| `sourceBasis.originalName` | 原文明确给出要素中文名称时记录其原名，构建前按出处校正；只有上级地域或旧成果中的前缀不算名称出处。 |
 | `sourceReview` | 在根对象或相关要素下记录尚未解决的问题，如 `[{"reference":"通告第二条引用的管理办法","reason":"期限届满，尚未核对续期或替代文件"}]`。引用效力或适用范围未核实，不把相关限制写成确定值；记录保留时只能交付草稿。可选字段正常缺失不用列为阻断。 |
 | `geometryEvidence.kind` 与 `reference` | 完整边界用 `enc`、`source-boundary` 或 `user-gml`，注明版次、附表或来源 ID。圆形用 `source-circle` 并给 `center:[纬度,经度]` 和 `radiusMetres`。由断面切分、共边拼接或海图勾绘的候选用 `chart-trace`，保持待人工核查。没有出处的既有几何从流程草稿移除。 |
 | `geometryAnchors` | 当原文或独立海图明确某点应位于要素范围内、线上或位置处时，填写 `position:[纬度,经度]` 和 `reference`。例如桥区内的桥址、圆形水域中心、报告线端点。仅以原文精度或项目正式口径填 `toleranceMetres`，不能为通过匹配随意放宽。超差不自动补录，有歧义仍请人工指定；没有独立原文坐标就报告这项限制。 |
+| `coverageAreas` | 根级数组，每项记录 `geometry`（独立正式覆盖面的键）、`reference`（范围出处）和原文明确的显示比例尺。没有覆盖面依据时登记缺失，不能从要素外包框反造覆盖面。 |
 
 法规条文规定的报告义务用 `Regulations` 或 `Restrictions`，按发文机构及目录区分；用 `InclusionType(included)` 绑定 `Applicability`，并由对应地理要素的 `theRxN` 关联。保留条款适用对象、时机和例外；原文明示的是报告服务或报告程序时仍可用 `ShipReport`。VTS 区域、报告线和独立报告点分别依据主管机关的范围定义；不把折线拐点当作报告点。只有坐标、岸线和地名都能核对时才闭合服务区。
 
@@ -232,6 +237,8 @@ python3 $S/coords.py "37°27′04″N 122°08′49″E"           # 单点换算
 ```
 
 > 输出的坐标一律是 `[纬度, 经度]`，与 S-127 GML 的 `posList` 轴序一致。**不要调换**。
+
+附件包含多组交错的边界或报告线时，先运行 `coords.py --text 原文.txt --indexed` 查看脚本提取的 1 基序号，逐项核对原文次序，再提供计划，例如 `{"g-area":{"type":"surface","rows":[3,1,2]},"g-report":{"type":"curve","rows":[6,7]}}`。运行 `coords.py --text 原文.txt --plan 计划.json` 得到 `geometries` 对象。也可换成 `--csv 原始坐标.csv`。序号只指该次提取结果，需逐点对照原文；计划不确定时保留待补几何，不另写会阻断整批要素的索引脚本。
 
 ## 七步工作流
 
@@ -278,7 +285,7 @@ python3 /opt/skills/s127-gml/scripts/parse_office.py \
 ### ② 抽取共同属性
 文件头/尾一般给出全数据集共用的两组属性，放进 JSON 的 `common`：
 
-- `fixedDateRange`：生效/失效时间（"自2024年9月7日起施行，有效期五年" → `2024-09-07` / `2029-09-06`）
+- `fixedDateRange`：按来源得到施行日、最后有效日及届满界点，使用 `validityBasis` 记录推导依据和交付口径。
 - `sourceIndication`：发文机构、文号、文件发布日期、发文类型。找不到发布日期时省略 `reportedDate`。
   `source` 优先使用原文或已核实的文号，缺文号时用正式文件名，缺件说明写进报告。
 

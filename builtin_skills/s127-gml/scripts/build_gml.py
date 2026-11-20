@@ -557,6 +557,18 @@ def build(doc: dict, assoc_objects: bool = False, *, draft: bool = False):
             member_lines += render_value(key, attrs[key], 3, ftype)
         member_lines.append(f"{IND*2}</{ftype}>")
 
+    for number, entry in enumerate(doc.get("coverageAreas", []), 1):
+        gname = entry["geometry"]
+        prop, target_id = pool.add(gname, geoms[gname])
+        if prop != "s100:surfaceProperty":
+            raise ValueError("DataCoverage 须使用面")
+        member_lines.append(f'{IND*2}<DataCoverage gml:id="dc{number}">')
+        for scale in ("maximumDisplayScale", "minimumDisplayScale"):
+            member_lines += render_value(scale, entry.get(scale, {"$nil": True}), 3, "DataCoverage")
+        member_lines += [f"{IND*3}<geometry>",
+                         f'{IND*4}<{prop} xlink:href="#{target_id}"/>',
+                         f"{IND*3}</geometry>", f"{IND*2}</DataCoverage>"]
+
     if not pool.coords and not draft:
         raise ValueError("数据集不含任何坐标，无法计算 gml:boundedBy")
 

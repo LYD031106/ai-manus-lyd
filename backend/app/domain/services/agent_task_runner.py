@@ -386,13 +386,22 @@ class AgentTaskRunner(TaskRunner):
             yield ErrorEvent(error="No message")
             return
 
-        direct = re.fullmatch(r"S-?127\s+/(draft|complete|check)((?:\s+--match\s+[^=\s]+=[^=\s]+)*)",
-                              message.message.strip(), re.IGNORECASE)
+        direct = re.fullmatch(
+            r"S-?127\s+/(draft|complete|check)"
+            r"((?:\s+(?:--match\s+[^=\s]+=[^=\s]+|--require-coverage|--allow-restriction-3))*)",
+            message.message.strip(), re.IGNORECASE,
+        )
         if direct:
             action = direct.group(1).lower()
-            mapping = direct.group(2).split()[1::2]
+            options = direct.group(2).split()
+            mapping = [options[i + 1] for i, option in enumerate(options) if option.lower() == "--match"]
+            require_coverage = any(option.lower() == "--require-coverage" for option in options)
+            allow_restriction_3 = any(option.lower() == "--allow-restriction-3" for option in options)
             if mapping and action != "complete":
                 yield ErrorEvent(error="只有 S-127 /complete 可以指定 --match 要素标识=供体gml:id。")
+                return
+            if require_coverage and action != "check":
+                yield ErrorEvent(error="只有 S-127 /check 可以指定 --require-coverage。")
                 return
             expected = {"draft": [".json"], "complete": [".gml", ".json"], "check": [".gml"]}[action]
             provided = sorted(PurePosixPath(path).suffix.lower() for path in message.attachments)
@@ -403,7 +412,8 @@ class AgentTaskRunner(TaskRunner):
                 yield ErrorEvent(error=f"S-127 /{action} 需要上传 {', '.join(expected)} 文件。")
                 return
             directory = f"/home/ubuntu/s127-{uuid4().hex}"
-            event = await self._s127_result(action, directory, message.attachments, mapping)
+            event = await self._s127_result(action, directory, message.attachments, mapping,
+                                            require_coverage=require_coverage, allow_restriction_3=allow_restriction_3)
             if event:
                 yield event
                 yield DoneEvent()
@@ -435,7 +445,8 @@ class AgentTaskRunner(TaskRunner):
 
     
     async def _s127_result(self, action: str, directory: str, inputs: list[str],
-                           mapping: list[str] | None = None) -> MessageEvent | None:
+                           mapping: list[str] | None = None, *, require_coverage: bool = False,
+                           allow_restriction_3: bool = False) -> MessageEvent | None:
         """Run the fixed workflow and publish its files without another model turn."""
         report = f"{directory}/report.md"
         result = f"{directory}/S127.gml"
@@ -454,6 +465,10 @@ class AgentTaskRunner(TaskRunner):
             args += ["-o", result, "--featureset-out", json_path, "--assoc-csv", assoc_path, "--record", record_path]
         for match in mapping or []:
             args.extend(("--match", match))
+        if require_coverage:
+            args.append("--require-coverage")
+        if allow_restriction_3:
+            args.append("--allow-restriction-3")
         candidates = [report, result, f"{directory}/S127.draft.gml", json_path, assoc_path, record_path]
         outputs = " ".join(shlex.quote(path) for path in candidates)
         command = (

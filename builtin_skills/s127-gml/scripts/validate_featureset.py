@@ -449,7 +449,11 @@ def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
         err("dataset", str(exc))
 
     common = doc.get("common") or {}
-    if "fixedDateRange" in common:
+    try:
+        source_rules.source_review(common)
+    except ValueError as exc:
+        err("common", str(exc))
+    if common.get("fixedDateRange") is not None:
         check_date_range("common", common["fixedDateRange"])
     if "sourceIndication" in common:
         check_source_indication("common", common["sourceIndication"])
@@ -459,6 +463,10 @@ def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
     geom_kinds = {}
     for name, spec in geoms.items():
         geom_kinds[name] = check_geometry(name, spec)
+    try:
+        spatial_checks.coverage_entries(doc)
+    except ValueError as exc:
+        err("coverageAreas", str(exc))
 
     features = doc.get("features") or []
     if not features:

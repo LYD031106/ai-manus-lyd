@@ -79,10 +79,12 @@ class ExecutionAgent(BaseAgent):
             request += (
                 f"\nFor S-127 source encoding, save the complete featureset JSON at "
                 f"{message.s127_checkpoint_dir}/featureset-input.json as soon as it is usable. "
-                "Create that directory in the sandbox. Call the built-in geometry_workflow.py draft "
-                "immediately after writing it and attach the GML, normalized JSON and report in "
-                "complete_step. Read the applicable recipe once, batch file reads, and deliver "
-                "the draft before optional outputs or further source investigation."
+                "Create that directory in the sandbox. Write source-grounded names, attributes and "
+                "associations to the JSON before refining geometry. Use the built-in coords.py "
+                "--indexed and --plan for ordered source coordinate selections. When a boundary "
+                "cannot be built, leave that feature's geometry unset and keep its source and "
+                "associations. Call geometry_workflow.py draft immediately after writing usable "
+                "JSON and attach the GML, normalized JSON and report in complete_step."
             )
         step.status = ExecutionStatus.RUNNING
         yield StepEvent(status=StepStatus.STARTED, step=step)
