@@ -210,6 +210,8 @@ python3 $S/make_record_table.py featureset.json \
 
 草稿和补录阶段对 `restrictionClauses` 中列过的要素重算全区 `restriction`。有全区限制的普通航道和警戒水域可归为 `RestrictedAreaNavigational`。要素目录不支持的限制通过条款正文和关联保留，兼容码仅按本项目已确认的选项启用。缺少关联正文、适用范围或效力证据时列入待复核，补录几何后仍保留草稿状态。用生成后的清单执行 `check --source-featureset`，核对 GML 的全区码值。
 
+桥梁信息通告中，净空宽度、设计船型和桥孔参数属于技术资料。要给桥区填写限制码，须另找现行适用的条款，注明 `evidenceKind: regulatory-clause` 并写明独立出处。原文给出紧急情况、维护船、时段或气象等例外时，以条件条款保留。有局部水域限定且确有独立依据证明目标正好是该局部时，在 `extentBasis` 说明依据。正文与附件使用不同航段名称且同一性未证实时，将对应关系登记待核，正文保留在规则中，暂缓关联到候选航段。
+
 法规条文规定的报告义务用 `Regulations` 或 `Restrictions`，按发文机构及目录区分；用 `InclusionType(included)` 绑定 `Applicability`，并由对应地理要素的 `theRxN` 关联。保留条款适用对象、时机和例外；原文明示的是报告服务或报告程序时仍可用 `ShipReport`。VTS 区域、报告线和独立报告点分别依据主管机关的范围定义；不把折线拐点当作报告点。只有坐标、岸线和地名都能核对时才闭合服务区。
 
 船型、货物或作业条件限定的富余水深在 UCAA 填 `sourceBasis.kind=conditional-underkeel`。按原文写水深数值、计算依据和多值运算，并通过 `theRxN` 关联含正文和 `Applicability` 的规则。正文保留严格大于与大于等于的区别以及“散装”等限定。多个条件仅在原文逻辑一致时并入同一个 `Applicability`，混合 AND/OR 或目录无法表达时保留完整判定文字。

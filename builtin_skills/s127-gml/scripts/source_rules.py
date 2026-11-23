@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+import re
 
 from coords import circle_surface
 from s127_model import GEOGRAPHIC_FEATURES, binding, geometry_allowed, resolve_enum
@@ -10,6 +11,10 @@ AREA_KINDS = {"regulated-fairway", "bridge-waters", "bridge-information"}
 KINDS = AREA_KINDS | {"routeing-measure", "reporting-obligation", "conditional-underkeel"}
 GEOMETRY_KINDS = {"enc", "source-boundary", "source-circle", "chart-trace", "user-gml"}
 RESTRICTION_SCOPES = {"area-wide", "conditional", "partial", "unverified"}
+EVIDENCE_KINDS = {"regulatory-clause", "technical-data"}
+CLAUSE_EXCEPTION = re.compile(r"除[^，。；;]{1,100}外(?=[，、,：:]|$)|\b(?:except|unless|exempt(?:ed)?)\b", re.I)
+NESTED_SCOPE = re.compile(r"范围内的|\b(?:within the portion|only within)\b", re.I)
+CLEARANCE_WIDTH_FIELD = re.compile(r"[「“\"](?:通航)?净空宽(?:度)?[」”\"]|\b(?:column|field)\s+(?:horizontal\s+)?clearance width\b", re.I)
 
 
 def ref(feature):
@@ -128,13 +133,26 @@ def select_restricted_area(feature, attrs):
         attrs.pop(field, None)
 
 
+def area_wide_review(feature, clause, code):
+    evidence_kind = clause.get("evidenceKind")
+    if evidence_kind == "technical-data":
+        return "技术资料须与法规义务分开记录；全区限制需要现行适用的条款"
+    if basis(feature).get("kind") == "bridge-information":
+        if evidence_kind != "regulatory-clause" or (code == 37 and CLEARANCE_WIDTH_FIELD.search(clause["reference"])):
+            return "桥梁技术资料需另有现行适用条款才能设置全区限制；桥孔净空宽度属于技术尺度"
+    _, label = resolve_enum("restriction", code)
+    if label.endswith("prohibited") and CLAUSE_EXCEPTION.search(clause["evidence"]):
+        return "原文包含例外或附加条件，须在关联规则中保留，复核后再编码"
+    if NESTED_SCOPE.search(clause["evidence"]) and not has_text(clause.get("extentBasis")):
+        return "原文限定了局部范围，请核对目标范围，或以局部条款关联规则"
+    return None
+
+
 def apply_restriction_clauses(doc, *, allow_restriction_3=False):
     """Compile restrictions for explicit feature refs and retain limitations in linked rules."""
     clauses = doc.get("restrictionClauses", [])
     if not isinstance(clauses, list):
         raise ValueError("restrictionClauses 须为条款数组")
-    if not clauses:
-        return {}
     features = {ref(feature): feature for feature in doc.get("features", [])}
     by_target = {}
     for index, clause in enumerate(clauses, start=1):
@@ -159,10 +177,31 @@ def apply_restriction_clauses(doc, *, allow_restriction_3=False):
             raise ValueError(f"第 {index} 条有条件、局部适用或未核实，不可填写全区 restriction 码")
         if "regulation" in clause and not has_text(clause["regulation"]):
             raise ValueError(f"第 {index} 条的 regulation 须为规则要素 ref")
+        if "evidenceKind" in clause and (not has_text(clause["evidenceKind"]) or clause["evidenceKind"] not in EVIDENCE_KINDS):
+            raise ValueError(f"第 {index} 条的 evidenceKind 无效")
+        if "extentBasis" in clause and not has_text(clause["extentBasis"]):
+            raise ValueError(f"第 {index} 条的 extentBasis 须描述完整覆盖目标的独立依据")
         for key in targets:
             by_target.setdefault(key, []).append((clause, code))
 
     notes = {}
+    for key, feature in features.items():
+        if key in by_target or basis(feature).get("kind") != "bridge-information":
+            continue
+        attrs = feature.get("attributes") or {}
+        restriction = attrs.get("restriction")
+        if restriction and not (isinstance(restriction, dict) and restriction.get("$nil")):
+            attrs.pop("restriction")
+            review = feature.setdefault("sourceReview", [])
+            if not isinstance(review, list):
+                raise ValueError(f"{key} 的 sourceReview 须为数组")
+            item = {"reference": basis(feature).get("reference") or str(key),
+                    "reason": "桥梁通告的限制编码缺少现行适用条款，待核实",
+                    "rule": "restriction-scope"}
+            if item not in review:
+                review.append(item)
+            notes[key] = item["reason"]
+
     for key, entries in by_target.items():
         feature = features[key]
         attrs = feature.get("attributes") or {}
@@ -175,10 +214,10 @@ def apply_restriction_clauses(doc, *, allow_restriction_3=False):
         codes = []
         for clause, code in entries:
             scope = clause["scope"]
-            reason = None
+            reason = area_wide_review(feature, clause, code) if scope == "area-wide" else None
             if scope == "unverified":
                 reason = clause["evidence"]
-            elif scope == "area-wide":
+            elif scope == "area-wide" and reason is None:
                 ftype = feature["type"]
                 candidate = "RestrictedAreaNavigational" if ftype in {"WaterwayArea", "CautionArea"} else ftype
                 restriction = binding(candidate, "restriction")

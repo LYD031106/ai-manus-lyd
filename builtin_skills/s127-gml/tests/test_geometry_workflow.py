@@ -90,10 +90,47 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.assertEqual(first["type"], "RestrictedAreaNavigational")
         self.assertEqual(first["featureName"]["zho"], "新港桥桥区水域")
         self.assertEqual(second["featureName"]["zho"], "新港北桥桥区水域")
-        self.assertEqual(second["attributes"], {"restriction": [35]})
+        self.assertNotIn("restriction", first["attributes"])
+        self.assertNotIn("restriction", second["attributes"])
+        self.assertIn("限制编码缺少现行适用条款", self.report("bridge.md"))
         self.assertNotIn("textContent", second)
         self.assertIn("当地高程基面", self.report("bridge.draft.gml"))
         self.assertNotIn("90 米", self.report("bridge.draft.gml"))
+
+    def test_restriction_evidence_flags_technical_width_exceptions_and_nested_areas(self):
+        self.write_json("seed.json", [
+            feature("bridge", "RestrictedAreaNavigational", "北湾桥水域",
+                    sourceBasis={"kind": "bridge-information", "reference": "桥梁资料表"}),
+            feature("channel", "RestrictedAreaNavigational", "北湾通航孔航道"),
+            feature("approach", "RestrictedAreaNavigational", "北湾桥区进港水域"),
+        ])
+        doc = json.loads(self.report("seed.json"))
+        doc["restrictionClauses"] = [
+            {"reference": "桥梁资料表第2行「通航净空宽度」", "evidence": "通航净空宽度 75 米",
+             "scope": "area-wide", "code": 37, "targets": ["bridge"], "evidenceKind": "regulatory-clause"},
+            {"reference": "北湾通航规则第六条", "evidence": "船舶在北湾桥水域内禁止掉头",
+             "scope": "area-wide", "code": 35, "targets": ["bridge"], "evidenceKind": "regulatory-clause"},
+            {"reference": "北湾通航规则第七条", "evidence": "禁止在本航道内锚泊。",
+             "scope": "area-wide", "code": 1, "targets": ["channel"]},
+            {"reference": "北湾通航规则第八条", "evidence": "禁止在桥区水域范围内的通航孔航道追越。",
+             "scope": "area-wide", "code": 28, "targets": ["channel"]},
+            {"reference": "北湾通航规则第九条", "evidence": "除维护船外，禁止驶入进港水域。",
+             "scope": "area-wide", "code": 7, "targets": ["approach"]},
+        ]
+        (self.directory / "seed.json").write_text(json.dumps(doc), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "draft", "seed.json", "-o", "guarded.gml",
+                        "--featureset-out", "guarded.json", "--report", "guarded.md")
+        bridge, channel, approach = json.loads(self.report("guarded.json"))["features"]
+        self.assertEqual(bridge["attributes"]["restriction"], [35])
+        self.assertEqual(channel["attributes"]["restriction"], [1])
+        self.assertNotIn("restriction", approach["attributes"])
+        report = self.report("guarded.md")
+        self.assertIn("桥孔净空宽度属于技术尺度", report)
+        self.assertIn("原文限定了局部范围", report)
+        self.assertIn("原文包含例外或附加条件", report)
+        self.run_script("geometry_workflow.py", "complete", "guarded.json", "-o", "completed.gml",
+                        "--featureset-out", "rechecked.json", "--report", "completed.md")
+        self.assertEqual(json.loads(self.report("rechecked.json"))["features"], [bridge, channel, approach])
 
     def test_reporting_obligation_requires_rule_with_spatial_and_vessel_links(self):
         basis = {"kind": "reporting-obligation", "reference": "北湾通告 第十九条"}
