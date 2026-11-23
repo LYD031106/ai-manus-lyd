@@ -231,6 +231,12 @@ def check_composite(where: str, complex_attr: str | None, value: dict) -> None:
     for key, (lo, _up) in subs.items():
         if lo >= 1 and count_of(key, value.get(key)) < 1:
             warn(where, f"要素目录把 {complex_attr}/{key} 标为必填，当前缺失")
+    if complex_attr == "underkeelAllowance":
+        settings = sum(count_of(key, value.get(key)) > 0 for key in (
+            "underkeelAllowanceFixed", "underkeelAllowanceVariableDraughtBased", "underkeelAllowanceVariableBeamBased",
+        ))
+        if settings > 1 and not count_of("operation", value.get("operation")):
+            err(where, "同时填写多种富余水深参数时须按原文明确 operation")
 
 
 # ---------------------------------------------------------------------------
@@ -490,6 +496,14 @@ def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
                     for a in (area.get("associations") or []) if a.get("role") == "reptForTrafficServ"}
     geographically_linked = {a.get("target") for feat in features if feat.get("type") in GEOGRAPHIC_FEATURES
                              for a in feat.get("associations", []) if a.get("role") == "theRxN"}
+    scoped_rules = {
+        key for key, rule in refs.items()
+        if rule.get("type") in {"Regulations", "Restrictions"}
+        and (rule.get("textContent") or (rule.get("attributes") or {}).get("textContent"))
+        and any(a.get("role") == "isApplicableTo" and a.get("inclusion") == "included"
+                and refs.get(a.get("target"), {}).get("type") == "Applicability"
+                for a in (rule.get("associations") or []))
+    }
     used_geoms: set[str] = set()
 
     for ref, feat in refs.items():
@@ -566,6 +580,11 @@ def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
                 err(where, "该条文用途应以航行限制区表达")
             elif kind == "routeing-measure" and ftype != "RouteingMeasure":
                 err(where, "原文明示的航路措施应使用相应的 RouteingMeasure 类和类别")
+            elif kind == "conditional-underkeel":
+                if ftype != "UnderkeelClearanceAllowanceArea":
+                    err(where, "有条件的富余水深须使用 UnderkeelClearanceAllowanceArea")
+                elif not any(a.get("role") == "theRxN" and a.get("target") in scoped_rules for a in assocs):
+                    err(where, "有条件的富余水深须以 theRxN 关联包含条文和适用对象的 Regulations 或 Restrictions")
             elif kind == "reporting-obligation":
                 if ftype not in {"Regulations", "Restrictions"}:
                     err(where, "法规中的报告义务应使用 Regulations 或 Restrictions；不能直接当作 ShipReport")
@@ -696,7 +715,7 @@ def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
         if ftype in ("RestrictedAreaNavigational", "RestrictedAreaRegulatory") \
                 and not attrs.get("restriction"):
             warn(where, "限制区/监管区通常需要 restriction；否则考虑改用 WaterwayArea 或信息要素（指南 5.11、5.14）")
-        # 「不得/禁止锚泊」应落成 restriction 枚举，而非只写进 textContent
+        # 文本里的禁锚句子需要先核查范围、条件和例外。
         if ftype in ("RestrictedAreaNavigational", "RestrictedAreaRegulatory", "WaterwayArea"):
             restrictions = attrs.get("restriction")
             rest_labels = restrictions if isinstance(restrictions, list) else [restrictions]
@@ -705,9 +724,9 @@ def validate(doc: dict, *, allow_restriction_3: bool = False) -> None:
                 for _path, text in iter_texts(
                     {"textContent": feat.get("textContent"), "attributes": feat.get("attributes")}
                 ):
-                    if "锚泊" in text:
-                        warn(where, "textContent 含「锚泊」但未用 restriction = anchoring prohibited；"
-                                    "「不得/禁止锚泊」应落到 RestrictedAreaNavigational 的 restriction 枚举")
+                    if "禁止锚泊" in text or "不得锚泊" in text:
+                        warn(where, "textContent 含禁锚条款。全区适用时核对 restriction；"
+                                    "有条件、例外或仅局部适用时核对关联规则")
                         break
         if ftype == "RouteingMeasure" and attrs.get("categoryOfRouteingMeasure") == "recommended route":
             if not any(ROLE_TITLE.get(a.get("role")) == "PermissionType" for a in assocs):

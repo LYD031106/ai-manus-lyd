@@ -67,6 +67,26 @@
       "$ref": "#/definitions/sourceReview",
       "description": "影响整个数据集的来源争议或适用性待核对项"
     },
+    "restrictionClauses": {
+      "type": "array",
+      "description": "逐条核对原文后填写。对已列入的要素，数组应覆盖其全部限制依据，阶段一和二均按依据计算全区 restriction。",
+      "items": {
+        "type": "object",
+        "required": ["reference", "evidence", "scope", "targets"],
+        "additionalProperties": false,
+        "properties": {
+          "reference": {"type": "string", "minLength": 1},
+          "evidence": {"type": "string", "minLength": 1, "description": "适用范围、条件和例外的可复核原文。未核实时填写具体缺失的依据。"},
+          "scope": {"enum": ["area-wide", "conditional", "partial", "unverified"]},
+          "targets": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "code": {"type": ["integer", "string"], "description": "全区适用的 restriction 码或要素目录标签"},
+          "regulation": {"type": "string", "minLength": 1, "description": "承载条款正文并由适用范围通过 theRxN 关联的 Regulations 或 Restrictions ref"}
+        },
+        "if": {"properties": {"scope": {"const": "area-wide"}}},
+        "then": {"required": ["code"]},
+        "else": {"not": {"required": ["code"]}}
+      }
+    },
     "coverageAreas": {
       "type": "array",
       "description": "独立发布覆盖范围，只引用经核实的覆盖面",
@@ -117,7 +137,7 @@
         "properties": {
           "reference": {"type": "string", "minLength": 1},
           "reason": {"type": "string", "minLength": 1},
-          "rule": {"const": "validity", "description": "有效期校验自动产生；重新构建时重新确定"}
+          "rule": {"enum": ["validity", "restriction-scope"], "description": "由相应来源校验自动产生；重新构建时重新确定"}
         }
       }
     },
@@ -595,7 +615,7 @@
           "required": ["kind", "reference"],
           "description": "条文提取阶段记录的事实，供构建前检查；不写入 GML",
           "properties": {
-            "kind": {"enum": ["regulated-fairway", "bridge-waters", "bridge-information", "routeing-measure", "reporting-obligation"]},
+            "kind": {"enum": ["regulated-fairway", "bridge-waters", "bridge-information", "routeing-measure", "reporting-obligation", "conditional-underkeel"]},
             "reference": {"type": "string", "minLength": 1},
             "originalName": {"type": "string", "minLength": 1},
             "partitionGroup": {"type": "string", "minLength": 1, "description": "原文或海图明确需要独立几何时使用的分组；不是按名称猜测"},

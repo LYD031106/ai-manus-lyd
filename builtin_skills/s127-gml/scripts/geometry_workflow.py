@@ -18,7 +18,7 @@ from gml_to_featureset import (
     GML, XLINK, XSI_NIL, convert, dataset_members, local, parse_geometries, reference,
 )
 from make_record_table import build_comments, build_rows, write_csv, write_xlsx
-from s127_model import ENUMS, GEOGRAPHIC_FEATURES, SRS, geometry_allowed
+from s127_model import ENUMS, GEOGRAPHIC_FEATURES, SRS, geometry_allowed, resolve_enum
 
 S127_DATASET = "{http://www.iho.int/S127/gml/cs0/1.0}Dataset"
 WGS84 = {SRS, "urn:ogc:def:crs:EPSG::4326", "urn:ogc:def:crs:EPSG:0:4326"}
@@ -270,16 +270,26 @@ def check_coverage(doc, areas):
         return [f"DataCoverage 未通过覆盖检查：{exc}"]
 
 
-def audit_source_context(doc, source):
+def restriction_codes(feature):
+    values = (feature.get("attributes") or {}).get("restriction")
+    values = values if isinstance(values, list) else [values]
+    return {resolve_enum("restriction", value)[0] for value in values if isinstance(value, (int, str))}
+
+
+def audit_source_context(doc, source, *, allow_restriction_3=False):
     if not isinstance(source, dict) or not isinstance(source.get("features"), list) or not all(
         isinstance(feature, dict) for feature in source["features"]
     ):
         raise ValueError("来源清单须含有 features 要素对象数组")
+    managed = source_rules.apply_restriction_clauses(source, allow_restriction_3=allow_restriction_3)
     problems = source_review_items(source)
-    located = [f for f in source["features"] if spatial_checks.anchors(f)]
+    located = {feature_ref(f) for f in source["features"] if spatial_checks.anchors(f)}
+    to_check = [f for f in source["features"] if feature_ref(f) in located or feature_ref(f) in managed]
     have_geometry = [f for f in doc["features"] if f.get("geometry")]
+    source_by_ref = {feature_ref(f): f for f in source["features"]}
+    output_by_ref = {feature_ref(f): f for f in doc["features"]}
     matches = {}
-    for f in located:
+    for f in to_check:
         names = name_keys(f.get("featureName"))
         found = [g for g in have_geometry if g["type"] == f["type"] and names & name_keys(g.get("featureName"))]
         if len(found) > 1:
@@ -287,18 +297,42 @@ def audit_source_context(doc, source):
         matches[feature_ref(f)] = found
     uses = Counter(feature_ref(g) for found in matches.values() for g in found)
     checked = 0
-    for feature in located:
+    checked_restrictions = 0
+    for feature in to_check:
         label = feature_label(feature) or feature_ref(feature)
         found = matches[feature_ref(feature)]
         if len(found) != 1 or uses[feature_ref(found[0])] != 1:
-            problems.append(f"{label}：最终 GML 找不到唯一符合原文位置的同名同类要素，需复核对应关系")
+            problems.append(f"{label}：最终 GML 找不到唯一的同名同类要素，需按原文范围核对对应关系")
             continue
         shape = doc["geometries"][found[0]["geometry"]]
-        problems.extend(f"{label}：{issue}" for issue in spatial_checks.conflicts(feature, shape))
-        checked += 1
+        if feature_ref(feature) in located:
+            problems.extend(f"{label}：{issue}" for issue in spatial_checks.conflicts(feature, shape))
+            checked += 1
+        if feature_ref(feature) in managed:
+            expected, actual = restriction_codes(feature), restriction_codes(found[0])
+            if expected != actual:
+                problems.append(f"{label}：全区 restriction 应为 {sorted(expected)}，GML 实际为 {sorted(actual)}")
+            output_rules = list(regulations_for(found[0], output_by_ref))
+            for rule in regulations_for(feature, source_by_ref):
+                names = name_keys(rule.get("featureName"))
+                if not any(rule["type"] == item["type"] and names & name_keys(item.get("featureName"))
+                           and (item.get("textContent") or (item.get("attributes") or {}).get("textContent"))
+                           for item in output_rules):
+                    problems.append(f"{label}：GML 缺少带条文的关联 {feature_label(rule) or feature_ref(rule)}")
+            checked_restrictions += 1
     coverage = (f"来源清单有 {len(located)} 个带原文锚点的要素，实际对照 {checked} 个；其余位置须另外核对。"
                 if located else "来源清单未提供几何锚点；未校验要素与原文的空间位置。")
+    if managed:
+        coverage += f" 原文限制编码适用 {len(managed)} 个要素，已对照 {checked_restrictions} 个。"
     return problems, coverage
+
+
+def regulations_for(feature, features):
+    for assoc in feature.get("associations") or []:
+        if assoc.get("role") == "theRxN":
+            target = features.get(assoc.get("target"), {})
+            if target.get("type") in {"Regulations", "Restrictions"}:
+                yield target
 
 
 def report_section(title, items, empty="未发现问题。"):
@@ -324,7 +358,14 @@ def format_inventory(rows):
 
 def produce(args):
     doc = json.loads(args.input.read_text(encoding="utf-8-sig"))
-    notes = source_rules.normalize_draft(doc, allow_restriction_3=args.allow_restriction_3) if args.command == "draft" else {}
+    try:
+        notes = source_rules.apply_restriction_clauses(doc, allow_restriction_3=args.allow_restriction_3)
+    except ValueError as exc:
+        write_report(args.report, report_section("限制条款的原文依据", [str(exc)]))
+        return 1
+    if args.command == "draft":
+        for key, detail in source_rules.normalize_draft(doc, allow_restriction_3=args.allow_restriction_3).items():
+            notes[key] = "；".join(filter(None, (notes.get(key), detail)))
     for key, detail in source_rules.prepare_geometries(doc).items():
         notes[key] = "；".join(filter(None, (notes.get(key), detail)))
     checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
@@ -488,7 +529,9 @@ def audit(args):
         if args.source_featureset is not None and not checks.errors:
             try:
                 source = json.loads(args.source_featureset.read_text(encoding="utf-8-sig"))
-                context_problems, context_coverage = audit_source_context(doc, source)
+                context_problems, context_coverage = audit_source_context(
+                    doc, source, allow_restriction_3=args.allow_restriction_3,
+                )
             except (OSError, KeyError, TypeError, ValueError) as exc:
                 context_problems = [f"来源清单无法完成独立复核：{exc}"]
     except (OSError, ET.ParseError, KeyError, AttributeError, IndexError, ValueError) as exc:

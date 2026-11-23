@@ -119,6 +119,88 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.assertIn("<InclusionType", self.report("linked.draft.gml"))
         self.assertIsNone(ET.parse(self.directory / "linked.draft.gml").getroot().find(".//{*}Regulations/{*}geometry"))
 
+    def test_area_restrictions_are_derived_from_scope_across_both_phases(self):
+        self.write_json("seed.json", [
+            feature("west", "WaterwayArea", "白沙西航道", geometry="a", attributes={"dynamicResource": 1},
+                    geometryEvidence={"kind": "source-boundary", "reference": "附图一"},
+                    associations=[{"role": "theRxN", "target": "operations"}]),
+            feature("east", "CautionArea", "白沙东警戒区", geometry="b", attributes={"restriction": [30]},
+                    geometryEvidence={"kind": "source-boundary", "reference": "附图二"},
+                    associations=[{"role": "theRxN", "target": "operations"}]),
+            feature("operations", "Restrictions", "捕捞及追越条件",
+                    textContent={"information": {"text": {"zho": "禁止捕捞。能见度不良时禁止客船追越。"}}}),
+        ], SURFACES)
+        seed = json.loads(self.report("seed.json"))
+        seed["restrictionClauses"] = [
+            {"scope": "area-wide", "targets": ["east", "west"], "reference": "第八条",
+             "evidence": "附图一和附图二范围内禁止锚泊。", "code": "anchoring prohibited"},
+            {"scope": "area-wide", "targets": ["east", "west"], "reference": "第九条",
+             "evidence": "附图一和附图二范围内禁止捕捞。", "code": 3, "regulation": "operations"},
+            {"scope": "conditional", "targets": ["east"], "reference": "第十条", "regulation": "operations",
+             "evidence": "能见度不良时禁止客船追越。"},
+            {"scope": "partial", "targets": ["west"], "reference": "第十一条",
+             "evidence": "仅对西航道入口的限制适用，尚缺保留范围的规则。"},
+        ]
+        (self.directory / "seed.json").write_text(json.dumps(seed), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "draft", "seed.json", "-o", "data.gml",
+                        "--featureset-out", "source.json", "--report", "draft.md")
+        result = json.loads(self.report("source.json"))
+        west, east, _ = result["features"]
+        for area in (west, east):
+            self.assertEqual(area["type"], "RestrictedAreaNavigational")
+            self.assertEqual(area["attributes"], {"restriction": [1]})
+        self.assertEqual(west["sourceReview"][0]["reference"], "第十一条")
+        self.assertIn("禁止捕捞", self.report("data.draft.gml"))
+        self.assertIn("能见度不良时禁止客船追越", self.report("data.draft.gml"))
+
+        self.run_script("geometry_workflow.py", "complete", "source.json", "-o", "promoted.gml",
+                        "--featureset-out", "rechecked.json", "--report", "complete.md", "--allow-restriction-3")
+        rechecked = json.loads(self.report("rechecked.json"))
+        self.assertEqual(rechecked["features"][0]["attributes"]["restriction"], [1, 3])
+        self.assertEqual(len(rechecked["features"][0]["sourceReview"]), 1)
+        self.assertFalse((self.directory / "promoted.gml").exists())
+        self.assertTrue((self.directory / "promoted.draft.gml").exists())
+
+        result["restrictionClauses"].pop()
+        (self.directory / "resolved.json").write_text(json.dumps(result), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "complete", "resolved.json", "-o", "final.gml",
+                        "--featureset-out", "ready.json", "--report", "ready.md")
+        final = self.report("final.gml")
+        altered = final.replace('<restriction code="1">anchoring prohibited</restriction>',
+                                '<restriction code="8">entry restricted</restriction>', 1)
+        (self.directory / "changed.gml").write_text(altered, encoding="utf-8")
+        self.run_script("geometry_workflow.py", "check", "changed.gml", "--source-featureset", "resolved.json",
+                        "--report", "checked.md", code=1)
+        self.assertIn("全区 restriction 应为 [1]，GML 实际为 [8]", self.report("checked.md"))
+
+        seed["restrictionClauses"][2]["code"] = 28
+        (self.directory / "seed.json").write_text(json.dumps(seed), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "draft", "seed.json", "-o", "wrong.gml",
+                        "--report", "wrong.md", code=1)
+        self.assertIn("不可填写全区 restriction 码", self.report("wrong.md"))
+
+    def test_conditional_underkeel_preserves_applicability_and_operator(self):
+        underkeel = feature("depth", "UnderkeelClearanceAllowanceArea", "东湾水域",
+                            sourceBasis={"kind": "conditional-underkeel", "reference": "港区规则 第三条"},
+                            attributes={"underkeelAllowance": {"underkeelAllowanceFixed": 0.6,
+                                                               "underkeelAllowanceVariableDraughtBased": 9}})
+        self.write_json("unscoped.json", [underkeel])
+        self.run_script("geometry_workflow.py", "draft", "unscoped.json", "-o", "wrong.gml",
+                        "--report", "wrong.md", code=1)
+        self.assertIn("须以 theRxN 关联包含条文和适用对象", self.report("wrong.md"))
+        self.assertIn("同时填写多种富余水深参数时须按原文明确 operation", self.report("wrong.md"))
+        underkeel["attributes"]["underkeelAllowance"]["operation"] = "largest value"
+        underkeel["associations"] = [{"role": "theRxN", "target": "rule"}]
+        rule = feature("rule", "Regulations", "富余水深限定",
+                       textContent={"information": {"text": {"zho": "客船富余水深须大于吃水比例阈值，且不小于固定阈值。"}}},
+                       associations=[{"role": "isApplicableTo", "target": "vessels", "inclusion": "included"}])
+        vessels = feature("vessels", "Applicability", "客船", attributes={"information": {"text": {"zho": "客船"}}})
+        self.write_json("scoped.json", [underkeel, rule, vessels])
+        self.run_script("geometry_workflow.py", "draft", "scoped.json", "-o", "depth.gml", "--report", "depth.md")
+        result = self.report("depth.draft.gml")
+        self.assertIn("客船富余水深须大于吃水比例阈值，且不小于固定阈值", result)
+        self.assertIn('<operation code="1">largest value</operation>', result)
+
     def test_three_phases_preserve_vts_associations(self):
         vts = feature("vts", "VesselTrafficServiceArea", "沙湾交管区",
                       associations=[{"role": "reptForTrafficServ", "target": "report"}])

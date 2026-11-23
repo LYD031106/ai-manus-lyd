@@ -4,11 +4,12 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from coords import circle_surface
-from s127_model import GEOGRAPHIC_FEATURES, geometry_allowed
+from s127_model import GEOGRAPHIC_FEATURES, binding, geometry_allowed, resolve_enum
 
 AREA_KINDS = {"regulated-fairway", "bridge-waters", "bridge-information"}
-KINDS = AREA_KINDS | {"routeing-measure", "reporting-obligation"}
+KINDS = AREA_KINDS | {"routeing-measure", "reporting-obligation", "conditional-underkeel"}
 GEOMETRY_KINDS = {"enc", "source-boundary", "source-circle", "chart-trace", "user-gml"}
+RESTRICTION_SCOPES = {"area-wide", "conditional", "partial", "unverified"}
 
 
 def ref(feature):
@@ -120,6 +121,98 @@ def apply_validity(owner, key):
     return f"最后有效日 {last.isoformat()}；届满界点 {expiry.isoformat()}" if last else None
 
 
+def select_restricted_area(feature, attrs):
+    feature["type"] = "RestrictedAreaNavigational"
+    for field in ("categoryOfRouteingMeasure", "categoryOfTrafficSeparationScheme",
+                  "categoryOfNavigationLine", "dynamicResource"):
+        attrs.pop(field, None)
+
+
+def apply_restriction_clauses(doc, *, allow_restriction_3=False):
+    """Compile restrictions for explicit feature refs and retain limitations in linked rules."""
+    clauses = doc.get("restrictionClauses", [])
+    if not isinstance(clauses, list):
+        raise ValueError("restrictionClauses 须为条款数组")
+    if not clauses:
+        return {}
+    features = {ref(feature): feature for feature in doc.get("features", [])}
+    by_target = {}
+    for index, clause in enumerate(clauses, start=1):
+        if not isinstance(clause, dict) or not all(has_text(clause.get(field)) for field in ("reference", "evidence")):
+            raise ValueError(f"第 {index} 条须填写原文出处 reference 及证据 evidence")
+        scope = clause.get("scope")
+        if not has_text(scope) or scope not in RESTRICTION_SCOPES:
+            raise ValueError(f"第 {index} 条 scope 无效")
+        targets = clause.get("targets")
+        if not isinstance(targets, list) or not targets:
+            raise ValueError(f"第 {index} 条须指定至少一个地理要素 ref")
+        if any(not has_text(key) or features.get(key, {}).get("type") not in GEOGRAPHIC_FEATURES for key in targets):
+            raise ValueError(f"第 {index} 条的 targets 须指向已有地理要素 ref")
+        if len(set(targets)) != len(targets):
+            raise ValueError(f"第 {index} 条的 targets 有重复 ref")
+        code = clause.get("code")
+        if scope == "area-wide":
+            if type(code) is not int and not has_text(code):
+                raise ValueError(f"第 {index} 条全区适用限制须填写 restriction 码或标签")
+            code, _ = resolve_enum("restriction", code)
+        elif "code" in clause:
+            raise ValueError(f"第 {index} 条有条件、局部适用或未核实，不可填写全区 restriction 码")
+        if "regulation" in clause and not has_text(clause["regulation"]):
+            raise ValueError(f"第 {index} 条的 regulation 须为规则要素 ref")
+        for key in targets:
+            by_target.setdefault(key, []).append((clause, code))
+
+    notes = {}
+    for key, entries in by_target.items():
+        feature = features[key]
+        attrs = feature.get("attributes") or {}
+        feature["attributes"] = attrs
+        attrs.pop("restriction", None)
+        prior_review = feature.get("sourceReview", [])
+        if not isinstance(prior_review, list):
+            raise ValueError(f"{key} 的 sourceReview 须为数组")
+        review = [item for item in prior_review if not (isinstance(item, dict) and item.get("rule") == "restriction-scope")]
+        codes = []
+        for clause, code in entries:
+            scope = clause["scope"]
+            reason = None
+            if scope == "unverified":
+                reason = clause["evidence"]
+            elif scope == "area-wide":
+                ftype = feature["type"]
+                candidate = "RestrictedAreaNavigational" if ftype in {"WaterwayArea", "CautionArea"} else ftype
+                restriction = binding(candidate, "restriction")
+                compatible = allow_restriction_3 and candidate == "RestrictedAreaNavigational" and code == 3
+                if restriction and (compatible or restriction[2] is None or code in restriction[2]):
+                    shape = (doc.get("geometries") or {}).get(feature.get("geometry"), {})
+                    if candidate != ftype and shape and not geometry_allowed(candidate, shape.get("type")):
+                        reason = "全域限制需要明确的范围几何，当前几何类型不适用"
+                    else:
+                        if candidate != ftype:
+                            select_restricted_area(feature, attrs)
+                        if code not in codes:
+                            codes.append(code)
+                        continue
+            if reason is None:
+                rule = features.get(clause.get("regulation"), {})
+                text = rule.get("textContent") or (rule.get("attributes") or {}).get("textContent")
+                linked = any(a.get("role") == "theRxN" and a.get("target") == ref(rule)
+                             for a in (feature.get("associations") or []))
+                if rule.get("type") not in {"Regulations", "Restrictions"} or not (text and linked):
+                    reason = f"{clause['evidence'].rstrip('。')}。须保留条款正文并以 theRxN 关联相应的 Regulations 或 Restrictions"
+            if reason is not None:
+                review.append({"reference": clause["reference"], "reason": reason, "rule": "restriction-scope"})
+        if codes:
+            attrs["restriction"] = codes
+        if review:
+            feature["sourceReview"] = review
+        else:
+            feature.pop("sourceReview", None)
+        references = "、".join(dict.fromkeys(clause["reference"] for clause, _ in entries))
+        notes[key] = f"已按条款适用范围核对限制编码（{references}）"
+    return notes
+
+
 def normalize_draft(doc, *, allow_restriction_3=False):
     notes = {}
 
@@ -161,11 +254,7 @@ def normalize_draft(doc, *, allow_restriction_3=False):
         if kind in AREA_KINDS and has_text(info.get("reference")):
             if ftype in {"RouteingMeasure", "WaterwayArea", "RestrictedAreaNavigational"}:
                 if ftype != "RestrictedAreaNavigational":
-                    feature["type"] = "RestrictedAreaNavigational"
-                    # These fields described the previous classification only.
-                    for field in ("categoryOfRouteingMeasure", "categoryOfTrafficSeparationScheme",
-                                  "categoryOfNavigationLine", "dynamicResource"):
-                        attrs.pop(field, None)
+                    select_restricted_area(feature, attrs)
                     note(key, "按有出处的范围用途改为航行限制区")
                 feature["attributes"] = attrs
                 if kind == "bridge-information":
