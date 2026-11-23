@@ -79,6 +79,7 @@
           "evidence": {"type": "string", "minLength": 1, "description": "适用范围、条件和例外的可复核原文。未核实时填写具体缺失的依据。"},
           "evidenceKind": {"enum": ["regulatory-clause", "technical-data"], "description": "区分现行适用条款与技术资料。桥梁信息通告需要独立法规依据才能写全区限制。"},
           "extentBasis": {"type": "string", "minLength": 1, "description": "原文写的是局部范围时，记录独立证据如何确认目标恰好为该范围。"},
+          "sourceQuote": {"type": "string", "minLength": 1, "description": "包含适用对象、局部范围及例外的连续原文摘录。关联规则的 information.text 保留这段原文。"},
           "scope": {"enum": ["area-wide", "conditional", "partial", "unverified"]},
           "targets": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
           "code": {"type": ["integer", "string"], "description": "全区适用的 restriction 码或要素目录标签"},
@@ -139,7 +140,7 @@
         "properties": {
           "reference": {"type": "string", "minLength": 1},
           "reason": {"type": "string", "minLength": 1},
-          "rule": {"enum": ["validity", "restriction-scope"], "description": "由相应来源校验自动产生；重新构建时重新确定"}
+          "rule": {"enum": ["validity", "restriction-scope", "restriction-target", "restriction-text"], "description": "由相应来源校验自动产生"}
         }
       }
     },

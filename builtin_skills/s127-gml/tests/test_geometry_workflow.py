@@ -79,7 +79,11 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.write_json("seed.json", [
             feature("first", "WaterwayArea", "新港桥桥区水域", attributes={"restriction": [35, 1]},
                     sourceBasis={"kind": "bridge-information", "reference": "桥梁通告附表第 1 行",
-                                 "verticalClearance": [{"zho": "通航净空高度 18 米（当地高程基面）"}]},
+                                 "verticalClearance": [
+                                     {"zho": "通航孔 2 个；主通航孔净空高度 18 米（当地高程基面）",
+                                      "eng": "2 navigable openings; main span vertical clearance 18 m (local datum)"},
+                                     {"zho": "净空宽度 80 米；设计通航船型 客船"},
+                                 ]},
                     textContent=[{"information": [{"text": {"zho": "通航宽度 90 米。"}}]}]),
             feature("second", "WaterwayArea", "新港北桥桥区水域", attributes={"restriction": [35]},
                     sourceBasis={"kind": "bridge-information", "reference": "桥梁通告附表第 2 行"}),
@@ -96,6 +100,9 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.assertNotIn("textContent", second)
         self.assertIn("当地高程基面", self.report("bridge.draft.gml"))
         self.assertNotIn("90 米", self.report("bridge.draft.gml"))
+        self.assertIn("主通航孔净空高度 18 米", self.report("bridge.draft.gml"))
+        self.assertNotIn("净空宽度", self.report("bridge.draft.gml"))
+        self.assertNotIn("navigable openings", self.report("bridge.draft.gml"))
 
     def test_restriction_evidence_flags_technical_width_exceptions_and_nested_areas(self):
         self.write_json("seed.json", [
@@ -131,6 +138,72 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.run_script("geometry_workflow.py", "complete", "guarded.json", "-o", "completed.gml",
                         "--featureset-out", "rechecked.json", "--report", "completed.md")
         self.assertEqual(json.loads(self.report("rechecked.json"))["features"], [bridge, channel, approach])
+
+    def test_direct_restrictions_and_linked_text_keep_independent_scope(self):
+        quote = "禁止船舶在防波堤内侧规定水域的航道上追越。"
+        full = "禁止船舶在进港航道和外湾警戒区内掉头。"
+        self.write_json("seed.json", [
+            feature("channel", "RestrictedAreaNavigational", "北湾进港航道",
+                    attributes={"restriction": [1, 7]}, clause="港口通告第九条", geometry="a",
+                    geometryEvidence={"kind": "source-boundary", "reference": "港口附图"},
+                    textContent={"information": {"text": {"zho": "除正在驶入的救援船外，其他船舶不得锚泊。"}}},
+                    associations=[{"role": "theRxN", "target": "passage"}]),
+            feature("warning", "CautionArea", "外湾警戒区",
+                    associations=[{"role": "theRxN", "target": "turning"}]),
+            feature("declared", "RestrictedAreaNavigational", "另一进港航道",
+                    associations=[{"role": "theRxN", "target": "passage"}]),
+            feature("passage", "Regulations", "航道追越规定", clause="港口通告第七条",
+                    textContent={"information": {"text": {"zho": "禁止船舶在航道上追越。"}}}),
+            feature("turning", "Regulations", "禁止掉头",
+                    textContent={"information": {"text": {"zho": full}}}),
+        ], SURFACES)
+        doc = json.loads(self.report("seed.json"))
+        doc["restrictionClauses"] = [
+            {"reference": "港口通告第七条", "evidence": quote, "sourceQuote": quote, "scope": "partial",
+             "regulation": "passage", "targets": ["channel"]},
+            {"reference": "港口通告第八条", "evidence": full, "scope": "area-wide",
+             "code": 35, "targets": ["declared"]},
+        ]
+        # Both direct codes are also candidates for the source compiler.
+        doc["restrictionClauses"].extend([
+            {"reference": "港口通告第九条", "evidence": "航道内禁止锚泊。", "scope": "area-wide", "code": 1,
+             "targets": ["channel"]},
+            {"reference": "港口通告第十条", "evidence": "禁止驶入港池。", "scope": "area-wide", "code": 7,
+             "targets": ["channel"]},
+        ])
+        (self.directory / "seed.json").write_text(json.dumps(doc), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "draft", "seed.json", "-o", "scoped.gml",
+                        "--featureset-out", "draft.json", "--report", "scoped.md")
+        channel, warning, declared, *_ = json.loads(self.report("draft.json"))["features"]
+        self.assertEqual(channel["attributes"]["restriction"], [7])
+        self.assertEqual(declared["attributes"]["restriction"], [35])
+        self.assertIn("撤下与同一条文例外冲突的全区码 1", self.report("scoped.md"))
+        self.assertIn("关联规则遗漏可核对的原文摘录", self.report("scoped.md"))
+        self.assertIn("以下目标缺少可核对的原文范围：declared", self.report("scoped.md"))
+        self.assertEqual(warning["sourceReview"][0]["rule"], "restriction-target")
+
+        unchecked = doc.copy()
+        unchecked.pop("restrictionClauses")
+        (self.directory / "unchecked.json").write_text(json.dumps(unchecked), encoding="utf-8")
+        self.run_script("build_gml.py", "unchecked.json", "-o", "unchecked.gml")
+        self.run_script("geometry_workflow.py", "check", "unchecked.gml", "--report", "unchecked.md", code=1)
+        self.assertIn("全区 restriction=1 与条文例外冲突", self.report("unchecked.md"))
+        self.assertNotIn("全区 restriction=7 与条文例外冲突", self.report("unchecked.md"))
+
+        doc["features"] = [doc["features"][0], doc["features"][3]]
+        doc["features"][1]["textContent"]["information"]["text"]["zho"] = quote
+        doc["restrictionClauses"] = doc["restrictionClauses"][:1]
+        (self.directory / "verified.json").write_text(json.dumps(doc), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "complete", "verified.json", "-o", "final.gml",
+                        "--featureset-out", "finished.json", "--report", "finished.md")
+        final = self.report("final.gml")
+        self.assertIn(quote, final)
+        self.run_script("geometry_workflow.py", "check", "final.gml", "--source-featureset", "finished.json",
+                        "--report", "final.md")
+        (self.directory / "altered.gml").write_text(final.replace(quote, "禁止船舶在航道上追越。"), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "check", "altered.gml", "--source-featureset", "finished.json",
+                        "--report", "altered.md", code=1)
+        self.assertIn("GML 关联规则遗漏 港口通告第七条 的原文范围或条件", self.report("altered.md"))
 
     def test_reporting_obligation_requires_rule_with_spatial_and_vessel_links(self):
         basis = {"kind": "reporting-obligation", "reference": "北湾通告 第十九条"}
@@ -465,6 +538,9 @@ class GeometryWorkflowTest(unittest.TestCase):
         self.assertIn("最终发布检查需要正式 DataCoverage 面", self.report("audit.md"))
         data["coverageAreas"] = [{"geometry": "coverage", "reference": "独立图层说明"}]
         seed.write_text(json.dumps(data), encoding="utf-8")
+        self.run_script("geometry_workflow.py", "check", "unchecked.gml", "--source-featureset", "initial.json",
+                        "--report", "audit.md", code=1)
+        self.assertIn("原文清单已登记独立覆盖面", self.report("audit.md"))
         self.run_script("build_gml.py", "initial.json", "-o", "covered.gml")
         self.run_script("geometry_workflow.py", "check", "covered.gml", "--require-coverage", "--report", "audit.md")
         self.assertIn("确实落在 DataCoverage", self.report("audit.md"))

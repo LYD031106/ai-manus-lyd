@@ -31,7 +31,7 @@ from build_gml import (  # noqa: E402
     expand_text_content,
     render_value,
 )
-from source_rules import validity_dates  # noqa: E402
+from source_rules import source_review, validity_dates  # noqa: E402
 from s127_model import (  # noqa: E402
     GEOGRAPHIC_FEATURES,
     NS_ATTRS,
@@ -228,6 +228,8 @@ def build_comments(doc: dict) -> list[str]:
             parts.append(f"条款出处：{feat['clause']}")
         if associations := assoc_text(feat, refs):
             parts.append(f"关联要素及关联类型：\n{associations}")
+        if reviews := source_review(feat):
+            parts.append("待核对的原文依据\n" + "\n".join(reviews))
         comments.append("\n\n".join(parts))
     return comments
 

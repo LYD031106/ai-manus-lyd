@@ -152,7 +152,8 @@ class RecordTableTest(unittest.TestCase):
             feature("ship", "Applicability"),
             feature("area", "RestrictedAreaNavigational", clause="第八条", associations=[
                 {"role": "permission", "target": "ship", "permission": "required"},
-            ], attributes={"restriction": ["fishing prohibited", "anchoring prohibited"]}),
+            ], attributes={"restriction": ["fishing prohibited", "anchoring prohibited"]},
+               sourceReview=[{"reference": "附图二", "reason": "水域边界待核对"}]),
         ])
         rows = build_rows(doc)
         with tempfile.TemporaryDirectory() as folder:
@@ -172,6 +173,7 @@ class RecordTableTest(unittest.TestCase):
                 self.assertEqual(sheet["E3"].border.bottom.style, "thin")
                 comment = sheet["H3"].comment.text
                 self.assertIn("第八条", comment)
+                self.assertIn("附图二：水域边界待核对", comment)
                 self.assertIn("permission→中文ship English ship（required）", comment)
                 self.assertEqual(sheet["B3"].data_type, "s")
             workbook.close()

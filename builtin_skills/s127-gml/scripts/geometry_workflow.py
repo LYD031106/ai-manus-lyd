@@ -315,10 +315,18 @@ def audit_source_context(doc, source, *, allow_restriction_3=False):
             output_rules = list(regulations_for(found[0], output_by_ref))
             for rule in regulations_for(feature, source_by_ref):
                 names = name_keys(rule.get("featureName"))
-                if not any(rule["type"] == item["type"] and names & name_keys(item.get("featureName"))
-                           and (item.get("textContent") or (item.get("attributes") or {}).get("textContent"))
-                           for item in output_rules):
+                counterparts = [item for item in output_rules if rule["type"] == item["type"]
+                                and names & name_keys(item.get("featureName"))
+                                and any(source_rules.information_texts(item))]
+                if not counterparts:
                     problems.append(f"{label}：GML 缺少带条文的关联 {feature_label(rule) or feature_ref(rule)}")
+                    continue
+                for clause in source.get("restrictionClauses", []):
+                    quote = clause.get("sourceQuote")
+                    if (quote and clause.get("regulation") == feature_ref(rule)
+                            and feature_ref(feature) in clause["targets"]
+                            and not any(source_rules.contains_quote(item, quote) for item in counterparts)):
+                        problems.append(f"{label}：GML 关联规则遗漏 {clause['reference']} 的原文范围或条件")
             checked_restrictions += 1
     coverage = (f"来源清单有 {len(located)} 个带原文锚点的要素，实际对照 {checked} 个；其余位置须另外核对。"
                 if located else "来源清单未提供几何锚点；未校验要素与原文的空间位置。")
@@ -366,6 +374,8 @@ def produce(args):
     if args.command == "draft":
         for key, detail in source_rules.normalize_draft(doc, allow_restriction_3=args.allow_restriction_3).items():
             notes[key] = "；".join(filter(None, (notes.get(key), detail)))
+    for key, detail in source_rules.prepare_bridge_clearances(doc).items():
+        notes[key] = "；".join(filter(None, (notes.get(key), detail)))
     for key, detail in source_rules.prepare_geometries(doc).items():
         notes[key] = "；".join(filter(None, (notes.get(key), detail)))
     checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
@@ -521,6 +531,10 @@ def audit(args):
                     member.remove(geometry)
         doc = convert(args.input, root=root, geoms_by_id=geometries)
         checks.validate(doc, allow_restriction_3=args.allow_restriction_3)
+        for feature in doc["features"]:
+            for code, sentence in source_rules.contradictory_restrictions(feature).items():
+                label = feature_label(feature) or feature_ref(feature)
+                structure_errors.append(f"{label}：全区 restriction={code} 与条文例外冲突。{sentence}")
         rows, _, blocked = inventory(doc, {})
         if coverage_shapes:
             coverage_errors.extend(check_coverage(doc, coverage_shapes))
@@ -532,6 +546,8 @@ def audit(args):
                 context_problems, context_coverage = audit_source_context(
                     doc, source, allow_restriction_3=args.allow_restriction_3,
                 )
+                if spatial_checks.coverage_entries(source) and not coverage_shapes:
+                    coverage_errors.append("原文清单已登记独立覆盖面，GML 缺少 DataCoverage。")
             except (OSError, KeyError, TypeError, ValueError) as exc:
                 context_problems = [f"来源清单无法完成独立复核：{exc}"]
     except (OSError, ET.ParseError, KeyError, AttributeError, IndexError, ValueError) as exc:
